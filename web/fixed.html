@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>raylib WebAssembly</title>
+  <style>
+    html, body {
+        background-color: black;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+    }
+    canvas {
+      display: block;
+      background-color: black;
+      width: 1280px;
+      height: 720px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="0"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'f') {
+            Module.requestFullscreen(true, false);
+        }
+    });
+    
+    var Module = {
+      canvas: canvas,
+      setStatus: function() {},
+      monitorRunDependencies: function() {}
+    };
+  </script>
+
+  {{{ SCRIPT }}}
+</body>
+</html>
