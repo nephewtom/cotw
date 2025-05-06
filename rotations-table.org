@@ -1,0 +1,148 @@
+* Introduction
+This file describes some mechanisms needed to store the state of the cube for the game Cube of The Words.
+It describes two tables, the rotations table and the bottom face table.
+
+* Rotations table
+The rotations table is a table that describes the state of the cube before applying a new rotation, and the result of applying that rotation, so the stored rotations can be simplified.
+
+** Explanation of terms used in the table
+The first row of the table show the possible values for the next rotation, i.e.: +x, -x, +z or -z.
+By X, means rotation on the X axis following the right hand rule, so y cross-product z = +x
+In the same manner z cross-product y = -x
+
+The first column, indicates the current state of rotations of the cube, before applying the next rotation.
+
+The intersection of the first row and first column, gives us the resulting rotation state after applying the next rotation to the current state rotation of the cube.
+
+The value i, denotes that no rotation has been applied to the cube.
+
+** IN-PROGRESS Write a program to generate that table
+*** First iteration:
+Start COMBINING +x,-x,+z,-z with +x,-x,+z,-z; and if +x-x, -x+x, +z-z or -z+z is found, set to i.
+DISPLAY the combination set.
+This iteration will give a result combination with a size of 2 rotation each.
+
+*** Second iteration:
+Taking the results from the first iteration, DISCARD the i entries.
+Then COMBINE them again with +x,-x,+z,-z.
+
+Now, SIMPLIFY the resulting combination:
+1) Trimming: if +x-x, -x+x, +z-z or -z+z are found in any item, then TRIM that part from each result.
+
+2) Equivalences: one rotation is equivalent to other, if it leaves the cube in the same faces orientation.
+
+   - For example, +x+x+x is equivalent to +x, and -x-x-x is equivalent to +x.
+     The equivalences of this type will be SIMPLIFIED, and discarded on next iteration.
+     
+   - Also, +x+x+z is equivalent to -x-x+z and there are others with similar pattern.
+     +x+z+x is equivalent to -x-z-x and +x-z+x is equivalent to -x+z-x and others with similar patterns.
+     The equivalences of this type will be MARKED with (=) and discarded on next iteration.
+   
+DISPLAY the result set.
+This iteration will give a result combination with a max size of 3 rotations each,
+and some results with only 1 rotation, due to the simplification.
+
+*** Third iteration
+Take the result from the second iteration and DISCARD the entries that have less than 3 rotations.
+Those will be the ones that have a size less than 6 chars, which have already been combined.
+For example, in this case, it will discard, +x in first 12-chunk, -x in the second 12-chunk, etc...
+
+
+
+Then again, COMBINE the resulting entries with +x,-x,+z,-z
+This iteration will give a result combination with a max size of 4 rotations each.
+Now, simplify the result combination:
+1) if the same rotation is repeated four consecutive times (+x+x+x+x, -x-x-x-x, etc), substitute them by i.
+2) if +x-x, -x+x, +z-z or -z+z are found in any item, then TRIM that part from each result.
+
+*** Fourth iteration
+Now, we are ready to run the fourth iteration.
+And analyze what can be simplified without the drudge manual work.
+
+** Table contents (manual)
+|-----------------+----------+----------+----------+----------|
+| current         | axis     | axis     | axis     | axis     |
+| rotations state | +x       | -x       | +z       | -z       |
+|-----------------+----------+----------+----------+----------|
+| i               | +x       | -x       | +z       | -z       |
+|                 |          |          |          |          |
+| +x              | +x+x     | i        | +x+z     | x-z      |
+| -x              | i        | -x-x     | -x+z     | -x-z     |
+| +z              | +z+x     | +z-x     | +z+z     | i        |
+| -z              | -z+x     | -z-x     | i        | -z-z     |
+|                 |          |          |          |          |
+| +x+x            | +x+x+x   | +x       | +x+x+z   | +x+x-z   |
+| +x+z            | +x+z+x   | +x+z-x   | +x+z+z   | +x       |
+| +x-z            | +x-z+x   | +x-z-x   | +x       | +x-z-z   |
+| -x-x            | -x       | -x-x-x   | -x-x+z   | -x-x+z   |
+| -x+z            | -x+z+x   | -x+z-x   | -x+z+z   | -x       |
+| -x-z            | -x-z+x   | -x-z-x   | -x       | -x-z-z   |
+| ...             |          |          |          |          |
+|                 |          |          |          |          |
+|                 |          |          |          |          |
+| +x+x+x          | i        | +x+x     | +x+x+x+z | +x+x+x-z |
+| +x+x+z          | +x+x+z+x | +x+x+z+x | +x+x+z+z | +x+x     |
+| +x+x-z          | +x+x-z+x | +x+x-z-x | +x+x     | +x+x-z-z |
+| +x+z+x          | +x+z+x+x | +x+z     | +x+z+x+z | +x+z+x-z |
+| +x+z-x          | +x+z     | +x+z-x-x | +x+z-x+z | +x+z-x-z |
+| +x+z+z          | +x+z+z+x | +x+z+z-x | +x+z+z+z | +x+z     |
+| +x-z+x          | +x-z+x+x | +x-z     | +x-z+x+z | +x-z+x+z |
+| +x-z-x          | +x-z     | +x-z-x-x | +x-z-x+z | +x-z-x-z |
+| +x-z-z          | +x-z-z+x | +x-z-z-x | +x-z     | +x-z-z-z |
+| ...             |          |          |          |          |
+|                 |          |          |          |          |
+|                 |          |          |          |          |
+
+* Bottom Face table
+The bottom face table stores the state of the bottom face of the cube (the face that is touching the ground), which is composed of two field, the number of the face and the orientation of that face.
+
+** Explanation of terms in the table
+This is the convention for the faces of the cube starting position with respect to x & z axis.
+#+begin_example
+
+T = TOP (face 1), F = FRONT (face 2), R = RIGHT (face 3) 
+Ba = BACK (face 4), L = LEFT (face 5), Bo = BOTTOM (face 6) 
+
+z <-----------------------------------+
+         +---+             +---+      | 
+         | Ba|             | 4 |      | 
+     +---+---+---+     +---+---+---+  | 
+     | L | T | R |     | 5 | 1 | 3 |  | 
+     +---+---+---+     +---+---+---+  | 
+         | F |             | 2 |      | 
+         +---+             +---+      | 
+         | Bo|             | 6 |      | 
+         +---+             +---+      | 
+                                      |
+                                      V
+                                      x
+
+#+end_example
+
+
+And this is the convention for the faces orientation with respect to x & z axis:
+#+begin_example
+ORIENTED_UP      ORIENTED_RIGHT     ORIENTED_DOWN      ORIENTED_LEFT
+z <--------+     z <--------+       z <--------+       z <--------+
+     |  ^  |          |     |            |     |            |     |
+     |  |  |          | --> |            |  |  |            | <-- |
+     |     |          |     |            |  V  |            |     |
+     +-----+          +-----+            +-----+            +-----+
+           |                |                  |                  |
+           V                V                  V                  V
+           x                x                  x                  x
+
+#+end_example
+
+** Table contents
+|-------------------------+--------+------+--------+--------|
+| current rotations state | +x     | -x   | +z     | -z     |
+|-------------------------+--------+------+--------+--------|
+| i                       | 5L     | 3R   | 4U     | 2D     |
+| +x                      | +x+x   | i    | +x+z   | x-z    |
+| -x                      | i      | -x-x | -x+z   | -x-z   |
+| +x+x                    | +x+x+x | +x   | +x+x+z | +x+x-z |
+
+
+* Reference
+https://www.euclideanspace.com/maths/discrete/groups/categorise/finite/cube/index.htm
