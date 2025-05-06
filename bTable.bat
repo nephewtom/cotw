@@ -1,6 +1,7 @@
-del gen-table.exe
+echo off
+del gentable.exe
 
 :: gcc -g -Wall -pedantic -I./sds -c sds/sds.c
-g++ -g -Wall -I. -I./sds gen-table.cpp -o gen-table.exe sds.o
+gcc -g -Wall -I. -I./sds gentable.cpp -o gentable.exe sds.o
 
-.\gen-table.exe
+.\gentable.exe

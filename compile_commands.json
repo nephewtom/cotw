@@ -3,5 +3,12 @@
         "directory": "d:/playground/raylib/cube-of-the-words/",
         "command": "g++ -target x86_64-pc-windows-gnu -Wall -Wextra -Id:/playground/raylib/cube-of-the-words -Id:/playground/raylib/rolling-cube/raylib/src -Id:/playground/raylib/rolling-cube/rlImgui/src -Id:/playground/raylib/rolling-cube/rlImGui/imgui -Id:/playground/raylib/rolling-cube/r3d/src -Id:/playground/raylib/rolling-cube/r3d/src/details -Id:/playground/raylib/rolling-cube/r3d/src/details/containers -Id:/playground/raylib/rolling-cube/r3d/src/details/misc -Id:/playground/raylib/rolling-cube/r3d/src/embedded -I C:/w64devkit/x86_64-w64-mingw32/include -I C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include -I C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include/c++ -I C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include/c++/x86_64-w64-mingw32 -o cube-of-the-words cube-of-the-words.o -lraylib -lgdi32 -lwinmm -std=c++20",
         "file": "d:/playground/raylib/cube-of-the-words/cube-of-the-words.cpp"
+    },
+
+	{
+        "directory": "d:/playground/raylib/cube-of-the-words/",
+        "command": "g++ -target x86_64-pc-windows-gnu -Wall -Wextra -I../../c_cpp/sds -I../../c_cpp/gb -I C:/w64devkit/x86_64-w64-mingw32/include -I C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include -I C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include/c++ -I C:/w64devkit/lib/gcc/x86_64-w64-mingw32/14.2.0/include/c++/x86_64-w64-mingw32 -o cube-of-the-words -o gen-table",
+        "file": "d:/playground/raylib/cube-of-the-words/gen-table.cpp"
     }
+	
 ]
