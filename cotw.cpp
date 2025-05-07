@@ -26,34 +26,42 @@ void drawAxis() {
     DrawCylinderEx((Vector3){0, 0, axisLength}, (Vector3){0, 0, axisLength + coneLength}, coneRadius, 0.0f, 8, BLUE);
 }
 
-enum Direction {
-	NONE, DIR_FORWARD, DIR_BACKWARD, DIR_RIGHT, DIR_LEFT
+enum MoveDirection {
+	NONE, FORWARD_MOVE, BACKWARD_MOVE, RIGHT_MOVE, LEFT_MOVE
 };
-enum FaceNumber {
-	FACE_NULL=0, FACE_TOP=1, FACE_FRONT=2, FACE_RIGHT=3, FACE_BACK=4, FACE_LEFT=5, FACE_BOTTOM=6
-};
-// This is the convention for the cube starting position and orientation.
-// T = Top (face 1), F = Front (face 2), R = Right (face 3) 
-// Ba = Back (face 4), L = Left (face 5), Bo = Bottom (face 6) 
+
+// This is the convention for the cube starting position and orientation:
+
+// T = TOP (face 1), F = FRONT (face 2), R = RIGHT (face 3) 
+// K = BACK (face 4), L = LEFT (face 5), M = BOTTOM (face 6) 
 //
 // z <-----------------------------------+
 //          +---+             +---+      | 
-//          | Ba|             | 4 |      | 
+//          | K |             | 4 |      | 
 //      +---+---+---+     +---+---+---+  | 
 //      | L | T | R |     | 5 | 1 | 3 |  | 
 //      +---+---+---+     +---+---+---+  | 
 //          | F |             | 2 |      | 
 //          +---+             +---+      | 
-//          | Bo|             | 6 |      | 
+//          | M |             | 6 |      | 
 //          +---+             +---+      | 
 //                                       |
 //                                       V
 //                                       x
 
-enum FaceOrientation {
-	ORIENTED_UP, ORIENTED_RIGHT, ORIENTED_DOWN, ORIENTED_LEFT
+struct Face {
+	enum Number {
+		NONE=0, TOP=1, FRONT=2, RIGHT=3, BACK=4, LEFT=5, BOTTOM=6
+	};
+	enum Orientation {
+		ORIENTED_UP, ORIENTED_RIGHT, ORIENTED_DOWN, ORIENTED_LEFT
+	};
+	Number number;
+	Orientation orientation;
 };
-// ORIENTED_TOP     ORIENTED_RIGHT     ORIENTED_DOWN      ORIENTED_LEFT
+
+
+// ORIENTED_UP      ORIENTED_RIGHT     ORIENTED_DOWN      ORIENTED_LEFT
 // z <--------+     z <--------+       z <--------+       z <--------+
 //      |  ^  |          |     |            |     |            |     |
 //      |  |  |          | --> |            |  |  |            | <-- |
@@ -63,24 +71,18 @@ enum FaceOrientation {
 //            V                V                  V                  V
 //            x                x                  x                  x
 
-struct Face {
-	enum FaceNumber {
-		NONE=0, TOP=1, FRONT=2, RIGHT=3, BACK=4, LEFT=5, BOTTOM=6
-	};
-	enum FaceOrientation {
-		ORIENTED_UP, ORIENTED_RIGHT, ORIENTED_DOWN, ORIENTED_LEFT
-	};
-	FaceNumber number;
-	FaceOrientation orientation;
-};
-
 
 struct Cube {
 	Model model;
 	Vector3 position;
 	Matrix transforms; // Transformations (translate, rotation and scale)
 	Matrix rotations;
-	Direction moveDirection;
+	MoveDirection moveDirection;
+	const Vector3 X_AXIS_POSITIVE = { 1, 0, 0 };
+	const Vector3 X_AXIS_NEGATIVE = { -1, 0, 0 };
+	const Vector3 Z_AXIS_POSITIVE = { 0, 0, 1 };
+	const Vector3 Z_AXIS_NEGATIVE = { 0, 0, -1 };
+	
 
 	float animationProgress = 0.0f;
 	float smooth;
@@ -96,6 +98,9 @@ struct Cube {
 	Vector3 rotationAxis;
 	Vector3 rotationPivot;
 	float rotationAngle;
+	
+	void foo(Vector3 v);
+	
 	
 	void init(Vector3 pos, bool smooth = true);
 	void update(float);
@@ -116,6 +121,7 @@ struct Cube {
 	void drawWordsTex();
 
 	Face bottomFace;
+
 };
 Cube cube;
 
@@ -166,29 +172,29 @@ void Cube::drawWordsTex() {
 
 void Cube::updateSliding(float delta) {
 	
-	Direction keyDirection = 
-		IsKeyPressed(KEY_UP) ? DIR_FORWARD :
-		IsKeyPressed(KEY_DOWN) ? DIR_BACKWARD :
-		IsKeyPressed(KEY_LEFT) ? DIR_LEFT :
-		IsKeyPressed(KEY_RIGHT) ? DIR_RIGHT :
+	MoveDirection inputDirection = 
+		IsKeyPressed(KEY_UP) ? FORWARD_MOVE :
+		IsKeyPressed(KEY_DOWN) ? BACKWARD_MOVE :
+		IsKeyPressed(KEY_LEFT) ? LEFT_MOVE :
+		IsKeyPressed(KEY_RIGHT) ? RIGHT_MOVE :
 		NONE;
 
-	if (!isSliding && !isRolling && keyDirection != NONE) {
+	if (!isSliding && !isRolling && inputDirection != NONE) {
 
-		if (keyDirection == DIR_FORWARD) {
+		if (inputDirection == FORWARD_MOVE) {
 			slideStep = {0, 0, -2};
 		}
-		else if (keyDirection == DIR_BACKWARD) {
+		else if (inputDirection == BACKWARD_MOVE) {
 			slideStep = {0, 0, 2};
 		}		
-		else if (keyDirection == DIR_LEFT) {
+		else if (inputDirection == LEFT_MOVE) {
 			slideStep = {-2, 0, 0};
 		}		
-		else if (keyDirection == DIR_RIGHT) {
+		else if (inputDirection == RIGHT_MOVE) {
 			slideStep = {2, 0, 0};
 		}
 		
-		moveDirection = keyDirection;
+		moveDirection = inputDirection;
 		startPosition = position;
 		endPosition = Vector3Add(position, slideStep);
 		
@@ -226,40 +232,40 @@ void Cube::updateSliding(float delta) {
 
 void Cube::updateRolling(float delta) {
 
-	Direction keyDirection = 
-		IsKeyPressed(KEY_W) ? DIR_FORWARD :
-		IsKeyPressed(KEY_A) ? DIR_LEFT :
-		IsKeyPressed(KEY_S) ? DIR_BACKWARD :
-		IsKeyPressed(KEY_D) ? DIR_RIGHT :
+	MoveDirection inputDirection = 
+		IsKeyPressed(KEY_W) ? FORWARD_MOVE :
+		IsKeyPressed(KEY_A) ? LEFT_MOVE :
+		IsKeyPressed(KEY_S) ? BACKWARD_MOVE :
+		IsKeyPressed(KEY_D) ? RIGHT_MOVE :
 		NONE;
 
-	if (!isRolling && !isSliding && keyDirection != NONE) {
+	if (!isRolling && !isSliding && inputDirection != NONE) {
 
 		Vector3 offset; // offset for rotationOrigin
 		Vector3 translation;
 		
-		if (keyDirection == DIR_FORWARD) {
+		if (inputDirection == FORWARD_MOVE) {
 			offset = {0, -1, -1};
-			rotationAxis = {-1, 0, 0};
+			rotationAxis = X_AXIS_NEGATIVE;
 			translation = {0, 0, -2};
 		}
-		else if (keyDirection == DIR_BACKWARD) {
+		else if (inputDirection == BACKWARD_MOVE) {
 			offset = {0, -1, 1};
-			rotationAxis = {1, 0, 0};
+			rotationAxis = X_AXIS_POSITIVE;
 			translation = {0, 0, 2};
 		}		
-		else if (keyDirection == DIR_LEFT) {
+		else if (inputDirection == LEFT_MOVE) {
 			offset = {-1, -1, 0};
-			rotationAxis = {0, 0, 1};
+			rotationAxis = Z_AXIS_POSITIVE;
 			translation = {-2, 0, 0};
 		}		
-		else if (keyDirection == DIR_RIGHT) {
+		else if (inputDirection == RIGHT_MOVE) {
 			offset = {1, -1, 0};
-			rotationAxis = {0, 0, -1};
+			rotationAxis = Z_AXIS_NEGATIVE;
 			translation = {2, 0, 0};
 		}
 		
-		moveDirection = keyDirection;
+		moveDirection = inputDirection;
 
 		rotationPivot = Vector3Add(position, offset);
 		endPosition = Vector3Add(position, translation);
@@ -319,10 +325,16 @@ void Cube::updateRolling(float delta) {
 			Matrix translationBackFromOrigin = MatrixTranslate(position.x, position.y, position.z);
 			transforms = MatrixMultiply(translationToOrigin, rotations);
 			transforms = MatrixMultiply(transforms, translationBackFromOrigin);
-
+			
+			
+			foo(rotationAxis);
+			
 			PlaySound(rollWav);
 		}
 	}
+}
+
+void Cube::foo(Vector3 v) {
 }
 
 void Cube::update(float delta) {
@@ -397,10 +409,10 @@ void drawText() {
 								  cube.endPosition.x, cube.endPosition.y, cube.endPosition.z), 
 					   10, 190, 20, DARKGRAY);
 		DrawScaledText(TextFormat("moveDirection: %s", 
-								  cube.moveDirection == DIR_FORWARD ? "forward" :
-								  cube.moveDirection == DIR_BACKWARD ? "backward" :
-								  cube.moveDirection == DIR_RIGHT ? "right" :
-								  cube.moveDirection == DIR_LEFT ? "left" : "idle"),
+								  cube.moveDirection == FORWARD_MOVE ? "forward" :
+								  cube.moveDirection == BACKWARD_MOVE ? "backward" :
+								  cube.moveDirection == RIGHT_MOVE ? "right" :
+								  cube.moveDirection == LEFT_MOVE ? "left" : "idle"),
 					   10, 210, 20, DARKGRAY);
 
 		
