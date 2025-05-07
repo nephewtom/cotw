@@ -70,7 +70,7 @@ MapEntry* state_map = NULL; // stb_ds hash table
 
 void init_state_map() {
     for (int i = 0; i < STATE_COUNT; i++) {
-		printf("state[%d]=%s\n", i, states[i]);
+		/* printf("state[%d]=%s\n", i, states[i]); */
 		shput(state_map, states[i], i);
     }
 }
@@ -87,10 +87,10 @@ void check_state_map() {
 
 const char* rotate(const char* current_state, enum rotation_axis axis) {
 	
-	printf("-> current_state:%s\n", current_state);
-	printf("-> rotation_axis:%d\n", axis);
+	/* printf("-> current_state:%s\n", current_state); */
+	/* printf("-> rotation_axis:%d\n", axis); */
 	int index = shget(state_map, current_state);
-	printf("-> index:%d\n", index);
+	/* printf("-> index:%d\n", index); */
 	
 	if (index == -1) {
 		printf("ERROR: State not found!\n");
@@ -101,7 +101,7 @@ const char* rotate(const char* current_state, enum rotation_axis axis) {
 		return NULL;
 	}
 	const char* result = rotation_table[index][axis];
-	printf("rotation_table[index=%i][axis=%i]=%s\n", index, axis, result);
+	printf("rotation_table[%i][%i]=%s\n", index, axis, result);
 	return result;
 }
 
@@ -141,6 +141,9 @@ int main() {
 		
 	char axis[32];
 	while (true) {
+		printf("--------------");
+		for (size_t i=0; i<strlen(state);i++) { printf("-");}
+		printf("\n");
 		printf("Current state:%s\n", state);
 		printf("Enter axis:");
 		if (fgets(axis, sizeof(axis), stdin) != NULL) {
@@ -149,6 +152,11 @@ int main() {
 				// Remove newline character if present
 				axis[len - 1] = '\0';
 			}
+			
+			if (strcmp(axis, "q") == 0) {
+				exit(0);
+			}
+			
 			enum rotation_axis rot_axis = get_rotation_axis(axis);
 			const char *result = rotate(state, rot_axis);
 			if (result != NULL) {

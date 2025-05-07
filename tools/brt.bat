@@ -1,2 +1,2 @@
-gcc -Wall rotations-table.c -o rotation-table.exe
+gcc -Wall -I.. rotations-table.c -o rotation-table.exe
 
