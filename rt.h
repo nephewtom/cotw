@@ -1,10 +1,10 @@
 #include <stdio.h>
-#include <stdbool.h>
 #include <string.h>
 
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
+// Rotation Events
 #define ROTATION_EVENT_COUNT 4
 const char* rotation_events[ROTATION_EVENT_COUNT] = { "+x", "-x", "+z", "-z" }; 
 
@@ -17,6 +17,7 @@ typedef enum {
 #define z_pos rotation_events[Z_POSITIVE]
 #define z_neg rotation_events[Z_NEGATIVE]
 
+// Rotation States
 #define ROTATION_STATE_COUNT 32
 const char* rotation_states[ROTATION_STATE_COUNT] = {
 	"i", "+x", "-x", "+z", "-z", "+x+x", "+x+z", "+x-z", "-x+z", "-x-z", "+z+x", "+z-x",
@@ -25,12 +26,12 @@ const char* rotation_states[ROTATION_STATE_COUNT] = {
 	"+z+z-x", "-z+x+x", "+x+x+z+z"
 };
 
+// Rotation Table
 typedef struct {
-	const char* rotation;
+	const char* state;
 	const char* tg_face; // touching ground face
 	const char* ls_face; // looking sky face
 } RotationEntry;
-
 
 RotationEntry rotation_table[ROTATION_STATE_COUNT][ROTATION_EVENT_COUNT] = {
     { {"+x", "5L", "3L"}, {"-x", "3R", "5R"}, {"+z", "4U", "2U"}, {"-z", "2D", "4D"} },
@@ -67,51 +68,18 @@ RotationEntry rotation_table[ROTATION_STATE_COUNT][ROTATION_EVENT_COUNT] = {
     { {"+x+z+z", "3L", "5L"}, {"-x+z+z", "5R", "3R"}, {"+z+x+x", "2U", "4U"}, {"+x+x+z", "4D", "2D"} }
 };
 
-
-
-// Hash map: string key to int index
+// Hash map to retrieve state index
 typedef struct {
 	const char* key;
 	int value;
-} RotationStateEntry;
+} rotation_state_entry;
 
-RotationStateEntry* rotation_state_map = NULL; // stb_ds hash table
-
+rotation_state_entry* rotation_state_map = NULL; // stb_ds hash table
 void init_state_map() {
 	for (int i = 0; i < ROTATION_STATE_COUNT; i++) {
 		printf("state[%d]=%s\n", i, rotation_states[i]);
 		shput(rotation_state_map, rotation_states[i], i);
 	}
-}
-void check_state_map() {
-	const char* queries[] = { "+x", "-x", "+z", "-z", "+x+x", "+x+x+z" };
-	char s[32];
-	for (int i = 0; i < 6; i++) {
-		strcpy(s, queries[i]);
-		int index = shget(rotation_state_map, s);
-		printf("%s -> %d\n", s, index);
-	}
-}
-
-int rotate(const char* current_state, rotation_axis axis, RotationEntry* rot_entry) {
-	
-	/* printf("-> current_state:%s\n", current_state); */
-	/* printf("-> rotation_axis:%d\n", axis); */
-	int index = shget(rotation_state_map, current_state);
-	/* printf("-> index:%d\n", index); */
-	
-	if (index == -1) {
-		printf("ERROR: State not found!\n");
-		return -1;
-	}
-	if (axis < X_POSITIVE || axis >= INVALID) {
-		printf("ERROR: Invalid rotation axis!\n");
-		return -1;
-	}
-	*rot_entry = rotation_table[index][axis];
-	printf("rotation_table[%i][%i]= (%s, %s, %s)\n", 
-		   index, axis, rot_entry->rotation, rot_entry->tg_face, rot_entry->ls_face);
-	return 0;
 }
 
 rotation_axis get_rotation_axis(const char* ra) {
@@ -129,18 +97,23 @@ const char* get_rotation_axis_str(rotation_axis ra) {
 	return "Invalid";
 }
 
-
-void show_rotation_table() {
-	for (int i=0; i<ROTATION_STATE_COUNT; i++) {
-		printf("%2d ", i+1);
-		for (int j=0; j<ROTATION_EVENT_COUNT; j++) {
-			RotationEntry rt = rotation_table[i][j];
-			printf("(%s, %s, %s)", rt.rotation, rt.tg_face, rt.ls_face);
-		}
-		printf("\n");
+int get_next_rotation_state(const char* current_state, rotation_axis axis, RotationEntry* rot_info) {
+	
+	int index = shget(rotation_state_map, current_state);
+	
+	if (index == -1) {
+		/* printf("ERROR: State not found!\n"); */
+		return -1;
 	}
+	if (axis < X_POSITIVE || axis >= INVALID) {
+		/* printf("ERROR: Invalid state axis!\n"); */
+		return -1;
+	}
+	*rot_info = rotation_table[index][axis];
+	return 0;
 }
 
+#if 0
 char state[32];
 char tg_face[16];
 char ls_face[16];
@@ -159,21 +132,19 @@ void rotate_cube() {
 	}
 			
 	rotation_axis rot_axis = get_rotation_axis(axis);
-	RotationEntry rot_entry;
-	int result = rotate(state, rot_axis, &rot_entry);
+	RotationEntry rot_info;
+	int result = get_next_rotation_state(state, rot_axis, &rot_info);
 	if (result == 0) {
-		printf("-> rot_entry: (%s, %s, %s)\n", 
-			   rot_entry.rotation, rot_entry.tg_face, rot_entry.ls_face);
-		strcpy(state, rot_entry.rotation);
-		strcpy(tg_face, rot_entry.tg_face);
-		strcpy(ls_face, rot_entry.ls_face);
+		printf("-> rot_info: (%s, %s, %s)\n", 
+			   rot_info.state, rot_info.tg_face, rot_info.ls_face);
+		strcpy(state, rot_info.state);
+		strcpy(tg_face, rot_info.tg_face);
+		strcpy(ls_face, rot_info.ls_face);
 	}
 }
 
 int main() {
 	init_state_map();
-	show_rotation_table();
-	check_state_map();
 	
 	strcpy(state, "i");
 	strcpy(tg_face, "6D");
@@ -193,3 +164,5 @@ int main() {
 	}
 	return 0;
 }
+
+#endif 

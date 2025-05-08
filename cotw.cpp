@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include "raymath.h"
+#include <cstring>
 #define SUPPORT_TRACELOG
 #define SUPPORT_TRACELOG_DEBUG
 #include "utils.h"
@@ -25,6 +26,8 @@ void drawAxis() {
     DrawCylinderEx(Vector3Zero(), (Vector3){0, 0, axisLength}, lineRadius, lineRadius, 8, BLUE);
     DrawCylinderEx((Vector3){0, 0, axisLength}, (Vector3){0, 0, axisLength + coneLength}, coneRadius, 0.0f, 8, BLUE);
 }
+
+#include "rt.h"
 
 enum MoveDirection {
 	NONE, FORWARD_MOVE, BACKWARD_MOVE, RIGHT_MOVE, LEFT_MOVE
@@ -70,6 +73,12 @@ struct Face {
 //            |                |                  |                  |
 //            V                V                  V                  V
 //            x                x                  x                  x
+struct RotationInfo {
+	char state[32];
+	char tg_face[16];
+	char ls_face[16];
+	RotationEntry entry;
+};
 
 
 struct Cube {
@@ -78,11 +87,10 @@ struct Cube {
 	Matrix transforms; // Transformations (translate, rotation and scale)
 	Matrix rotations;
 	MoveDirection moveDirection;
-	const Vector3 X_AXIS_POSITIVE = { 1, 0, 0 };
-	const Vector3 X_AXIS_NEGATIVE = { -1, 0, 0 };
-	const Vector3 Z_AXIS_POSITIVE = { 0, 0, 1 };
-	const Vector3 Z_AXIS_NEGATIVE = { 0, 0, -1 };
-	
+	const Vector3 X_VECTOR_POSITIVE = { 1, 0, 0 };
+	const Vector3 X_VECTOR_NEGATIVE = { -1, 0, 0 };
+	const Vector3 Z_VECTOR_POSITIVE = { 0, 0, 1 };
+	const Vector3 Z_VECTOR_NEGATIVE = { 0, 0, -1 };
 
 	float animationProgress = 0.0f;
 	float smooth;
@@ -95,12 +103,10 @@ struct Cube {
 
 	bool isRolling;
 	float rollingTime;
-	Vector3 rotationAxis;
+	Vector3 rotationAxisV;
+	rotation_axis rotationAxis;
 	Vector3 rotationPivot;
 	float rotationAngle;
-	
-	void foo(Vector3 v);
-	
 	
 	void init(Vector3 pos, bool smooth = true);
 	void update(float);
@@ -120,8 +126,7 @@ struct Cube {
 	Image wordsImage;
 	void drawWordsTex();
 
-	Face bottomFace;
-
+	RotationInfo rotationInfo;
 };
 Cube cube;
 
@@ -154,8 +159,10 @@ void Cube::init(Vector3 initPos, bool smoothBehaviour) {
 	rollWav = LoadSound("assets/roll.wav");
 	slideWav = LoadSound("assets/slide.wav");
 
-	bottomFace.number = Face::BOTTOM;
-	bottomFace.orientation = Face::ORIENTED_DOWN;
+	init_state_map();
+	strcpy(rotationInfo.state, "i");
+	strcpy(rotationInfo.ls_face, "1U");
+	strcpy(rotationInfo.tg_face, "6D");
 }
 
 void Cube::swapTexture() {
@@ -246,22 +253,26 @@ void Cube::updateRolling(float delta) {
 		
 		if (inputDirection == FORWARD_MOVE) {
 			offset = {0, -1, -1};
-			rotationAxis = X_AXIS_NEGATIVE;
+			rotationAxisV = X_VECTOR_NEGATIVE;
+			rotationAxis = X_NEGATIVE;
 			translation = {0, 0, -2};
 		}
 		else if (inputDirection == BACKWARD_MOVE) {
 			offset = {0, -1, 1};
-			rotationAxis = X_AXIS_POSITIVE;
+			rotationAxisV = X_VECTOR_POSITIVE;
+			rotationAxis = X_POSITIVE;
 			translation = {0, 0, 2};
 		}		
 		else if (inputDirection == LEFT_MOVE) {
 			offset = {-1, -1, 0};
-			rotationAxis = Z_AXIS_POSITIVE;
+			rotationAxisV = Z_VECTOR_POSITIVE;
+			rotationAxis = Z_POSITIVE;
 			translation = {-2, 0, 0};
 		}		
 		else if (inputDirection == RIGHT_MOVE) {
 			offset = {1, -1, 0};
-			rotationAxis = Z_AXIS_NEGATIVE;
+			rotationAxisV = Z_VECTOR_NEGATIVE;
+			rotationAxis = Z_NEGATIVE;
 			translation = {2, 0, 0};
 		}
 		
@@ -298,10 +309,10 @@ void Cube::updateRolling(float delta) {
 		transforms = MatrixMultiply(translationToOrigin, rotations);
 		transforms = MatrixMultiply(transforms, translationBackFromOrigin);
 		
-		// Now the current rotation is applied using rotationPivot, rotationAxis and the changing rotationAngle
+		// Now the current rotation is applied using rotationPivot, rotationAxisV and the changing rotationAngle
 		// Combining the matrices: first translate to rotationPivot, then rotating, then translate back
 		Matrix translationToPivot = MatrixTranslate(-rotationPivot.x, -rotationPivot.y, -rotationPivot.z);
-		Matrix rotation = MatrixRotate(rotationAxis, rotationAngle * DEG2RAD);
+		Matrix rotation = MatrixRotate(rotationAxisV, rotationAngle * DEG2RAD);
 		Matrix translationBackFromPivot = MatrixTranslate(rotationPivot.x, rotationPivot.y, rotationPivot.z);
 		
 		Matrix translationPlusRotation = MatrixMultiply(translationToPivot, rotation);
@@ -318,7 +329,7 @@ void Cube::updateRolling(float delta) {
 			animationProgress = 0.0f;
 
 			// Add the finished rotation (always 90 degrees) to accumulated rotations
-			Matrix finishedRotation = MatrixRotate(rotationAxis, 90.0f * DEG2RAD);
+			Matrix finishedRotation = MatrixRotate(rotationAxisV, 90.0f * DEG2RAD);
 			rotations = MatrixMultiply(rotations, finishedRotation);
 			
 			Matrix translationToOrigin = MatrixTranslate(-position.x, -position.y, -position.z);
@@ -327,14 +338,14 @@ void Cube::updateRolling(float delta) {
 			transforms = MatrixMultiply(transforms, translationBackFromOrigin);
 			
 			
-			foo(rotationAxis);
+			get_next_rotation_state(rotationInfo.state, rotationAxis, &rotationInfo.entry);
+			strcpy(rotationInfo.state, rotationInfo.entry.state);
+			strcpy(rotationInfo.ls_face, rotationInfo.entry.ls_face);
+			strcpy(rotationInfo.tg_face, rotationInfo.entry.tg_face);
 			
 			PlaySound(rollWav);
 		}
 	}
-}
-
-void Cube::foo(Vector3 v) {
 }
 
 void Cube::update(float delta) {
@@ -402,7 +413,7 @@ void drawText() {
 	
 	if (!cameraUpdateEnabled) {
 		
-		DrawScaledText("Some data", 10, 150, 20, RED);		
+		DrawScaledText("Movement data", 10, 150, 20, RED);		
 		DrawScaledText(TextFormat("position: (%.2f, %.2f, %.2f)", cube.position.x, cube.position.y, cube.position.z), 
 					   10, 170, 20, DARKGRAY);
 		DrawScaledText(TextFormat("endPosition: (%.2f, %.2f, %.2f)", 
@@ -416,20 +427,25 @@ void drawText() {
 					   10, 210, 20, DARKGRAY);
 
 		
-		DrawScaledText("Arrows slide the cube", 10, 280, 20, RED);
+		DrawScaledText("Arrows slide the cube", 10, 240, 20, RED);
 		DrawScaledText(TextFormat("isSliding: %s", cube.isSliding ? "true" : "false"),
-					   10, 300, 20, DARKGRAY);
+					   10, 260, 20, DARKGRAY);
 		DrawScaledText(TextFormat("slideStep: (%.1f, %.1f, %.1f)", cube.slideStep.x, cube.slideStep.y, cube.slideStep.z), 
-					   10, 320, 20, DARKGRAY);
+					   10, 280, 20, DARKGRAY);
 
 		
 		
-		DrawScaledText("WASD rolls the cube", 10, 360, 20, RED);
+		DrawScaledText("WASD rolls the cube", 10, 320, 20, RED);
 		DrawScaledText(TextFormat("isRolling: %s", cube.isRolling ? "true" : "false"),
-					   10, 380, 20, DARKGRAY);		
+					   10, 340, 20, DARKGRAY);		
 		DrawScaledText(TextFormat("rotationAngle: %.2f", cube.rotationAngle),
-					   10, 400, 20, DARKGRAY);
+					   10, 360, 20, DARKGRAY);
 
+		
+		DrawScaledText("ROTATION", 10, 400, 20, GREEN);
+		DrawScaledText(TextFormat("TOP:%s | BOTTOM:%s | state:%s", cube.rotationInfo.ls_face, 
+								  cube.rotationInfo.tg_face, cube.rotationInfo.state),
+					   10, 420, 20, BLUE);
 		
 		DrawScaledText(TextFormat("animationProgress: %.2f", cube.animationProgress),
 					   1000, 680, 20, DARKGRAY);

@@ -1,0 +1,60 @@
+* TODO Know which face is on the ground
+And in which orientation it is
+
+* Modify image&texture with word and revert it
+
+* Shader with normal map that makes words bump?
+
+* Quotes:
+#+begin_example
+An unexamined life is not worth living
+- Socrates
+
+Happiness depends upon ourselves
+- Aristotle
+
+Light tomorrow with today!
+- Elizabeth Barrett Browning
+
+The only way to have a friend is to be one
+- Ralph Waldo Emerson
+
+What we think, we become
+- Buddha
+
+We are what we repeatedly do
+- Aristotle
+
+Whatever you are, be a good one
+- Abraham Lincoln
+
+I can resist everything except temptation
+- Oscar Wilde
+
+Love all, trust a few, do wrong to none
+- William Shakespeare
+
+A friend to all is a friend to none
+- Aristotle
+
+I think, therefore I am
+- René Descartes
+
+To be, or not to be, that is the question
+- William Shakespeare
+#+end_example
+
+* Special quote
+#+begin_example
+“We know that they are lying, they know that they are lying, they even know that we know they are lying, we also know that they know we know they are lying too, they of course know that we certainly know they know we know they are lying too as well, but they are still lying. In our country, the lie has become not just moral category, but the pillar industry of this country.”
+― Aleksandr Solzhenitsyn
+
+
+“Sabemos que nos mienten
+Ellos saben que mienten
+Ellos saben que sabemos que nos mienten
+Sabemos que ellos saben que sabemos que nos mienten
+Y sin embargo, siguen mintiendo”
+
+- Aleksandr Isayevich Solzhenitsyn
+#+end_example

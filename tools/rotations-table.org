@@ -1,6 +1,4 @@
 * Introduction
-face
-
 This file describes some mechanisms needed to store the state of the cube for the game Cube of The Words (COTW).
 It describes the mechanisms and data necessary to save the cube orientation and be able to use it for the gameplay.
 
