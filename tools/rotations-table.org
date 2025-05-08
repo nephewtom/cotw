@@ -1,4 +1,6 @@
 * Introduction
+face
+
 This file describes some mechanisms needed to store the state of the cube for the game Cube of The Words (COTW).
 It describes the mechanisms and data necessary to save the cube orientation and be able to use it for the gameplay.
 
@@ -77,6 +79,7 @@ A resulting value of i, denotes that the resulting state is of no-rotation from 
 | +z+z-x   | +z+z     | +x+x+z+z | +x-z     | +x+z     |
 | -z+x+x   | -z-x     | -z+x     | +x+x+z+z | +x+x     |
 | +x+x+z+z | +x+z+z   | -x+z+z   | +z+x+x   | +x+x+z   |
+|----------+----------+----------+----------+----------|
 
 Manual analysis and a C program have been used to be generate this table.
 
@@ -343,7 +346,7 @@ Equivalences:
 +x+x+z+z-z = +x+x+z
 
 
-* Face on the ground
+* Faces tables
 It is necessary to know the orientation of the faces of the cube to apply textures in the right way.
 So first it is needed to follow a convention to later store it in the source code.
 
@@ -385,65 +388,111 @@ z <--------+     z <--------+       z <--------+       z <--------+
 #+end_example
 
 ** Touching Ground table
-For the COTW game prototype, the first approach is to know which face is touching the ground, because it is the one that is going to pick up or release the words.
+For the COTW game prototype, the first approach is to know which face is touching the ground.
+That is because it is the one that is going to pick up or release the words from the floor.
+We can name that face, the "Touching Ground" face, or *TG face*.
 
 At the starting point, the BOTTOM face (M) is the one touching the ground, but after some rotations that can not be the case, so we need to keep track of which face is touching the ground.
 
 Two fields are used to indicate which face is touching the ground, the face number and the face orientation.
-So, at the starting position, the face touching the ground is number 6, oriented down, or *6D*.
-
-Note: another approach could be to store face number and orientation that is opposite of the ground, which is more clear visually. Which we could also express with equivalences, 6D for the touching ground face is equivalent to 1U for the face facing the sky. We'll see how useful/clear it is in practice to use the ground table.
+So, at the starting position, the face touching the ground is number 6, oriented down, or 6D.
 
 *** TG table contents
 Starting value: 6D
 
-| state    | +x       | -x       | +z       | -z       |
-|----------+----------+----------+----------+----------|
-| i        | 5L       | 3R       | 4U       | 2D       |
-| +x       | 1U       | 6D       | 4L       | 2L       |
-| -x       | 6D       | 1U       | 4R       | 2R       |
-| +z       | 5U       | 3U       | 1D       | 6D       |
-| -z       | 5D       | 3D       | 6D       | 1D       |
-| +x+x     | 3R       | 5L       | 4D       | 2U       |
-| +x+z     | 1R       | 6R       | 3L       | 5L       |
-| +x-z     | 1L       | 6L       | 5L       | 3L       |
-| -x+z     | 6L       | 1L       | 5R       | 3R       |
-| -x-z     | 6R       | 1R       | 3R       | 5R       |
-| +z+x     | 2U       | 4U       | 1R       | 6L       |
-| +z-x     | 4U       | 2U       | 1L       | 6R       |
-| +z+z     | 5R       | 3L       | 2D       | 4U       |
-| -z+x     | 4D       | 2D       | 6R       | 1L       |
-| -z-x     | 2D       | 4D       | 6L       | 1R       |
+|----------+----+----+----+----|
+| state    | +x | -x | +z | -z |
+|----------+----+----+----+----|
+| i        | 5L | 3R | 4U | 2D |
+| +x       | 1U | 6D | 4L | 2L |
+| -x       | 6D | 1U | 4R | 2R |
+| +z       | 5U | 3U | 1D | 6D |
+| -z       | 5D | 3D | 6D | 1D |
+| +x+x     | 3R | 5L | 4D | 2U |
+| +x+z     | 1R | 6R | 3L | 5L |
+| +x-z     | 1L | 6L | 5L | 3L |
+| -x+z     | 6L | 1L | 5R | 3R |
+| -x-z     | 6R | 1R | 3R | 5R |
+| +z+x     | 2U | 4U | 1R | 6L |
+| +z-x     | 4U | 2U | 1L | 6R |
+| +z+z     | 5R | 3L | 2D | 4U |
+| -z+x     | 4D | 2D | 6R | 1L |
+| -z-x     | 2D | 4D | 6L | 1R |
+| +x+x+z   | 3D | 5D | 6U | 1U |
+| +x+x-z   | 3U | 5U | 1U | 6U |
+| +x+z+x   | 2R | 4L | 3D | 5U |
+| +x+z-x   | 4L | 2R | 3U | 5D |
+| +x+z+z   | 1D | 6U | 2L | 4L |
+| +x-z+x   | 4R | 2L | 5D | 3U |
+| +x-z-x   | 2L | 4R | 5U | 3D |
+| -x+z+z   | 6U | 1D | 2R | 4R |
+| +z+x+x   | 3U | 5U | 1U | 6U |
+| +z+x+z   | 2R | 4L | 3D | 5U |
+| +z+x-z   | 2L | 4R | 5U | 3D |
+| +z-x+z   | 4R | 2L | 5D | 3U |
+| +z-x-z   | 4L | 2R | 3U | 5D |
+| +z+z+x   | 6U | 1D | 2R | 4R |
+| +z+z-x   | 1D | 6U | 2L | 4L |
+| -z+x+x   | 3D | 5D | 6U | 1U |
+| +x+x+z+z | 3L | 5R | 2U | 4D |
+|----------+----+----+----+----|
 
-| +x+x+z   | -z-x     | -z+x     | +x+x+z+z | +x+x     |
-| +x+x-z   | +z-x     | +z+x     | +x+x     | +x+x+z+z |
-| +x+z+x   | -x-z     | +x+z     | -z-x     | +z+x     |
-| +x+z-x   | +x+z     | -x-z     | +z-x     | -z+x     |
-| +x+z+z   | +z+z     | +x+x+z+z | +x-z     | +x+z     |
-| +x-z+x   | -x+z     | +x-z     | -z+x     | +z-x     |
-| +x-z-x   | +x-z     | -x+z     | +z+x     | -z-x     |
-| -x+z+z   | +x+x+z+z | +z+z     | -x-z     | -x+z     |
-| +z+x+x   | +z-x     | +z+x     | +x+x     | +x+x+z+z |
-| +z+x+z   | -x-z     | +x+z     | -z-x     | +z+x     |
-| +z+x-z   | +x-z     | -x+z     | +z+x     | -z-x     |
-| +z-x+z   | -x+z     | +x-z     | -z+x     | +z-x     |
-| +z-x-z   | +x+z     | -x-z     | +z-x     | -z+x     |
-| +z+z+x   | +x+x+z+z | +z+z     | -x-z     | -x+z     |
-| +z+z-x   | +z+z     | +x+x+z+z | +x-z     | +x+z     |
-| -z+x+x   | -z-x     | -z+x     | +x+x+z+z | +x+x     |
-| +x+x+z+z | +x+z+z   | -x+z+z   | +z+x+x   | +x+x+z   |
+** Looking Sky table
+We can also store the face number and orientation for the face that is opposite to the ground.
+This is more clear visually, but let's see how useful/clear it is in practice to use the ground table.
+
+We can name the face that is opposite to the ground as the "Looking Sky" face or *LS face*.
+So, 6D for the TG face is equivalent to 1U for the LS face.
+
+It is easy to build the LS table from the TG table.
+Just doing these series of substitutions:
+
+| Face 1   | Face 2   | Face 3   | Face 4   | Face 5   | Face 6   |
+|----------+----------+----------+----------+----------+----------|
+| 1U -> 6D | 2U -> 4U | 3U -> 5U | 4U -> 2U | 5U -> 3U | 6U -> 1D |
+| 1D -> 6U | 2D -> 4D | 3D -> 5D | 4D -> 2D | 5D -> 3D | 6D -> 1U |
+| 1R -> 6L | 2R -> 4R | 3R -> 5R | 4R -> 2R | 5R -> 3R | 6R -> 1L |
+| 1L -> 6R | 2L -> 4L | 3L -> 5L | 4L -> 2L | 5L -> 3L | 6L -> 1R |
 
 
-
-
-
-
-** Faces equivalences
-Another approach *could* be to store face number and orientation for the face that is opposite of the ground.
-That is more clear visually, but let's see how useful/clear it is in practice to use the ground table.
-
-We can name the "Touching Ground" face with TG, and the opposite "Looking Sky" face with LS.
-So, TG 6D is equivalent to LS 1U, which we could express as TG6D = LS1U.
+*** LS table
+Starting value: 1D
+|----------+----+----+----+----+
+| state    | +x | -x | +z | -z |
+|----------+----+----+----+----+
+| i        | 3L | 5R | 2U | 4D |
+| +x       | 6D | 1U | 2L | 4L |
+| -x       | 1U | 6D | 2R | 4R |
+| +z       | 3U | 5U | 6U | 1U |
+| -z       | 3D | 5D | 1U | 6U |
+| +x+x     | 5R | 3L | 2D | 4U |
+| +x+z     | 6L | 1L | 5L | 3L |
+| +x-z     | 6R | 1R | 3L | 5L |
+| -x+z     | 1R | 6R | 3R | 5R |
+| -x-z     | 1L | 6L | 5R | 3R |
+| +z+x     | 4U | 2U | 6L | 1R |
+| +z-x     | 2U | 4U | 6R | 1L |
+| +z+z     | 3R | 5L | 4D | 2U |
+| -z+x     | 2D | 4D | 1L | 6R |
+| -z-x     | 4D | 2D | 1R | 6L |
+| +x+x+z   | 5D | 3D | 1D | 6D |
+| +x+x-z   | 5U | 3U | 6D | 1D |
+| +x+z+x   | 4R | 2L | 5D | 3U |
+| +x+z-x   | 2L | 4R | 5U | 3D |
+| +x+z+z   | 6U | 1D | 4L | 2L |
+| +x-z+x   | 2R | 4L | 3D | 5U |
+| +x-z-x   | 4L | 2R | 3U | 5D |
+| -x+z+z   | 1D | 6U | 4R | 2R |
+| +z+x+x   | 5U | 3U | 6D | 1D |
+| +z+x+z   | 4R | 2L | 5D | 3U |
+| +z+x-z   | 4L | 2R | 3U | 5D |
+| +z-x+z   | 2R | 4L | 3D | 5U |
+| +z-x-z   | 2L | 4R | 5U | 3D |
+| +z+z+x   | 1D | 6U | 4R | 2R |
+| +z+z-x   | 6U | 1D | 4L | 2L |
+| -z+x+x   | 5D | 3D | 1D | 6D |
+| +x+x+z+z | 5L | 3R | 4U | 2D |
+|----------+----+----+----+----+
 
 
 * Reference

@@ -1,2 +1,2 @@
-gcc -Wall -I.. rotations-table.c -o rotation-table.exe
-
+del rt.exe
+gcc -Wall -I.. rt.c -o rt.exe
