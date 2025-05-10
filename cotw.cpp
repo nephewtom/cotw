@@ -10,6 +10,47 @@
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
 
+// ---------------------------------------------------------------------------------------
+// Words
+// ---------------------------------------------------------------------------------------
+Font fontBubble;
+struct Word {
+	Model model;
+	Texture2D texture;
+	Image wordImage;
+	Image blankImage;
+	
+	void init(const char* text, Vector2 position) {
+		
+		// RLAPI void ImageDrawTextEx(Image *dst, Font font, const char *text, 
+		//                            Vector2 position, float fontSize, float spacing, Color tint);
+		blankImage = GenImageColor(120, 120, BLANK);
+		
+		wordImage = GenImageColor(120, 120, BLANK);
+		ImageDrawTextEx(&wordImage, fontBubble, text, position, (float) fontBubble.baseSize/2, 0.0f, BLACK);
+		
+		texture = LoadTextureFromImage(wordImage);
+		
+		Mesh planeMesh = GenMeshPlane(2.0, 2.0, 1, 1);
+		model = LoadModelFromMesh(planeMesh);
+		for (int i=0; i<model.materialCount; i++) {
+			model.materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
+			model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = texture;
+		}
+	}
+	
+	void pickup() {
+		// the word disappears on the ground
+		UpdateTexture(texture, blankImage.data);
+	}
+	
+	void release() {
+		// the word appears on the ground
+		UpdateTexture(texture, wordImage.data);		
+	}
+};
+Word wordCube;
+
 
 // ---------------------------------------------------------------------------------------
 // Cube stuff
@@ -25,6 +66,11 @@ struct RotationInfo {
 
 enum MoveDirection {
 	NONE, FORWARD_MOVE, BACKWARD_MOVE, RIGHT_MOVE, LEFT_MOVE
+};
+
+struct CellPos {
+	int x;
+	int z;
 };
 
 struct Cube {
@@ -100,9 +146,14 @@ struct Cube {
 	SwapAnim swap;
 	void setScaleAxis();
 	
+	bool isPickUp = false;
+	CellPos cellPos;
+	
+	
 	Sound rollWav;
 	Sound slideWav;
 	Sound pickupWav;
+	Sound releaseWav;
 };
 Cube cube;
 
@@ -118,6 +169,8 @@ void Cube::init(Vector3 initPos, bool smoothBehaviour) {
 	numbersTex = LoadTexture("./assets/cube-numbers.png");
 	
 	position = initPos; // it is moved 1.0f in y so it stays on the floor
+	cellPos = { (int)position.x/2 + 1, (int)position.z/2 + 1};
+
 	transforms = MatrixIdentity();
 	
 	rotations = MatrixIdentity(); // cube has no rotations at start
@@ -127,7 +180,9 @@ void Cube::init(Vector3 initPos, bool smoothBehaviour) {
 	rollWav = LoadSound("assets/roll.wav");
 	slideWav = LoadSound("assets/slide.wav");
 	pickupWav = LoadSound("assets/pickup.wav");
-
+	releaseWav = LoadSound("assets/release.wav");
+	
+	
 	// Check rt.h to understand this
 	init_state_map();
 	strcpy(rotationInfo.state, "i");
@@ -158,11 +213,18 @@ void Cube::handleWordsInput() {
 		
 		if (isSliding || isRolling) { return; }
 		
+		isPickUp = !isPickUp;
+		
 		isSwappingWord = true;
 		swap.progress = 0.0f;
 		
-		// TODO: Different sound to pickup and to release
-		PlaySound(pickupWav);
+		if (isPickUp) {
+			wordCube.pickup();
+			PlaySound(pickupWav);
+		} else {
+			wordCube.release();
+			PlaySound(releaseWav);
+		}
 	}
 }
 
@@ -219,6 +281,7 @@ void Cube::updateSliding(float delta) {
 		
 		if (animationProgress >= 1.0f) {
 			position = endPosition;
+			cellPos = { (int)position.x/2 + 1, (int)position.z/2 + 1};
 			isSliding = false;
 			animationProgress = 0.0f;			
 		}
@@ -303,6 +366,8 @@ void Cube::updateRolling(float delta) {
 		if (animationProgress >= 1.0f) {
 
 			position = endPosition;
+			cellPos = { (int)position.x/2 + 1, (int)position.z/2 + 1};
+
 			isRolling = false;
 			animationProgress = 0.0f;
 
@@ -350,7 +415,7 @@ void Cube::update(float delta) {
 		swap.progress += delta;
 		float t = swap.progress / swap.duration;
 
-		if (t < 1.0f) {
+		if (t <= 1.0f) {
 			// Ease in/out with sine
 			float squash = sinf(t * PI); // Goes from 0 to 1 to 0
 			swap.currentHeight = swap.baseHeight - squash * (swap.baseHeight - swap.squashHeight);
@@ -373,47 +438,42 @@ void drawAxis(Vector3 position,
 
 void Cube::draw() {
 	
+	Vector3 offset = { 0.0f, 0.0f, 0.0f};
+	Vector3 factor = { 1.0f, 1.0f, 1.0f}; // scale factor
 	if (isSwappingWord) {
-		
-		Vector3 offset = { 0.0f, 0.0f, 0.0f};
-		Vector3 amount = { 1.0f, 1.0f, 1.0f};
-		
 		if (swap.axis == Y_NEGATIVE) {
 			offset.y = swap.baseHeight * (1.0f - swap.scale) / 2.0f;
-			amount.y = swap.scale;
+			factor.y = swap.scale;
 		}
 		if (swap.axis == Y_POSITIVE) {
 			offset.y = swap.baseHeight * (swap.scale - 1.0f) / 2.0f;
-			amount.y = swap.scale;
+			factor.y = swap.scale;
 		}
 		if (swap.axis == Z_NEGATIVE) {
 			offset.z = swap.baseHeight * (1.0f - swap.scale) / 2.0f;
-			amount.z = swap.scale;
+			factor.z = swap.scale;
 		}
 		if (swap.axis == Z_POSITIVE) {
 			offset.z = swap.baseHeight * (swap.scale - 1.0f) / 2.0f;
-			amount.z = swap.scale;
+			factor.z = swap.scale;
 		}		
 		if (swap.axis == X_NEGATIVE) {
 			offset.x = swap.baseHeight * (1.0f - swap.scale) / 2.0f;
-			amount.x = swap.scale;
+			factor.x = swap.scale;
 		}
 		if (swap.axis == X_POSITIVE) {
 			offset.x = swap.baseHeight * (swap.scale - 1.0f) / 2.0f;
-			amount.x = swap.scale;
+			factor.x = swap.scale;
 		}		
 
-		
-		Matrix scale = MatrixTranslate(offset.x, offset.y, offset.z);
-		scale = MatrixMultiply(MatrixScale(amount.x, amount.y, amount.z), scale);
-		
-		// Matrix scale = MatrixTranslate(0, swap.baseHeight * (swap.scale - 1.0f) / 2, 0);
-		model.transform = scale;
-		
 		DrawCubeWires({position.x, position.y + (swap.currentHeight - swap.baseHeight) / 2, position.z}, 
-					  2.0, swap.currentHeight, 2.0, GREEN);
+					  2.0, swap.currentHeight, 2.0, PURPLE);
 	}
-	
+
+	Matrix scale = MatrixTranslate(offset.x, offset.y, offset.z);
+	scale = MatrixMultiply(MatrixScale(factor.x, factor.y, factor.z), scale);
+	model.transform = scale;
+
 	rlPushMatrix();
 	rlMultMatrixf(MatrixToFloat(transforms));
 	drawAxis(position, 1.5f, 0.02, 0.1, 0.05);
@@ -422,28 +482,6 @@ void Cube::draw() {
 }
 
 
-// ---------------------------------------------------------------------------------------
-// Words
-// ---------------------------------------------------------------------------------------
-Font fontBubble;
-struct Word {
-	Model model;
-	Texture2D texture;
-	
-	void init(const char* text) {
-		Image image = GenImageColor(120, 120, BLANK);
-		ImageDrawTextEx(&image, fontBubble, text, {25, 45}, (float) fontBubble.baseSize/2, 0.0f, BLACK);
-		texture = LoadTextureFromImage(image);
-		
-		Mesh planeMesh = GenMeshPlane(2.0, 2.0, 1, 1);
-		model = LoadModelFromMesh(planeMesh);
-		for (int i=0; i<model.materialCount; i++) {
-			model.materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
-			model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = texture;
-		}
-	}
-};
-Word w_Cube;
 
 // ---------------------------------------------------------------------------------------
 // Handle input
@@ -522,39 +560,41 @@ void drawText() {
 	
 	if (!cameraUpdateEnabled) {
 		
-		DrawScaledText("Movement data", 10, 150, 20, RED);		
+		DrawScaledText("Movement data", 10, 130, 20, RED);		
 		DrawScaledText(TextFormat("position: (%.2f, %.2f, %.2f)", cube.position.x, cube.position.y, cube.position.z), 
-					   10, 170, 20, DARKGRAY);
+					   10, 150, 20, DARKGRAY);
 		DrawScaledText(TextFormat("endPosition: (%.2f, %.2f, %.2f)", 
 								  cube.endPosition.x, cube.endPosition.y, cube.endPosition.z), 
-					   10, 190, 20, DARKGRAY);
+					   10, 170, 20, DARKGRAY);
 		DrawScaledText(TextFormat("moveDirection: %s", 
 								  cube.moveDirection == FORWARD_MOVE ? "forward" :
 								  cube.moveDirection == BACKWARD_MOVE ? "backward" :
 								  cube.moveDirection == RIGHT_MOVE ? "right" :
 								  cube.moveDirection == LEFT_MOVE ? "left" : "idle"),
-					   10, 210, 20, DARKGRAY);
+					   10, 190, 20, DARKGRAY);
 
 		
-		DrawScaledText("Arrows slide the cube", 10, 240, 20, RED);
+		DrawScaledText("Arrows slide the cube", 10, 220, 20, RED);
 		DrawScaledText(TextFormat("isSliding: %s", cube.isSliding ? "true" : "false"),
-					   10, 260, 20, DARKGRAY);
+					   10, 240, 20, DARKGRAY);
 		DrawScaledText(TextFormat("slide.step: (%.1f, %.1f, %.1f)", cube.slide.step.x, cube.slide.step.y, cube.slide.step.z), 
-					   10, 280, 20, DARKGRAY);
+					   10, 260, 20, DARKGRAY);
 
 		
-		
-		DrawScaledText("WASD rolls the cube", 10, 320, 20, RED);
+		DrawScaledText("WASD rolls the cube", 10, 300, 20, RED);
 		DrawScaledText(TextFormat("isRolling: %s", cube.isRolling ? "true" : "false"),
-					   10, 340, 20, DARKGRAY);		
+					   10, 320, 20, DARKGRAY);		
 		DrawScaledText(TextFormat("rollAnim.angle: %.2f", cube.rollAnim.angle),
-					   10, 360, 20, DARKGRAY);
+					   10, 340, 20, DARKGRAY);
 
 		
-		DrawScaledText("ROTATION", 10, 400, 20, GREEN);
+		DrawScaledText("ROTATION", 10, 380, 20, GREEN);
 		DrawScaledText(TextFormat("TOP:%s | BOTTOM:%s | state:%s", cube.rotationInfo.ls_face, 
 								  cube.rotationInfo.tg_face, cube.rotationInfo.state),
-					   10, 420, 20, BLUE);
+					   10, 400, 20, BLUE);
+
+		DrawScaledText(TextFormat("CellPos:(%i, %i)", cube.cellPos.x, cube.cellPos.z),
+					   10, 430, 20, GREEN);
 		
 		DrawScaledText(TextFormat("animationProgress: %.2f", cube.animationProgress),
 					   1000, 680, 20, DARKGRAY);
@@ -571,7 +611,7 @@ void draw() {
 		cube.draw();	
 		rlSetLineWidth(lineWidth);
 		
-		DrawModel(w_Cube.model, {1, 0, 1}, 1.0, WHITE);
+		DrawModel(wordCube.model, {1, 0, 1}, 1.0, WHITE);
 		
 		DrawGrid(10, 2.0f);
 		drawAxis({0,0,0});
@@ -657,7 +697,7 @@ void initWorld() {
 	fontBubble = LoadFontEx("./assets/Game Bubble.ttf", 64, 0, 0);
 	// fontKaisg = LoadFontEx("./assets/KAISG.ttf", 64, 0, 0);
 	
-	w_Cube.init("Cube");
+	wordCube.init("Cube", {25, 45});
 }
 
 
