@@ -4,13 +4,43 @@
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
+// This is the convention for the cube starting position and orientation:
+
+// T = TOP (face 1), F = FRONT (face 2), R = RIGHT (face 3) 
+// K = BACK (face 4), L = LEFT (face 5), M = BOTTOM (face 6) 
+//
+// z <-----------------------------------+
+//          +---+             +---+      | 
+//          | K |             | 4 |      | 
+//      +---+---+---+     +---+---+---+  | 
+//      | L | T | R |     | 5 | 1 | 3 |  | 
+//      +---+---+---+     +---+---+---+  | 
+//          | F |             | 2 |      | 
+//          +---+             +---+      | 
+//          | M |             | 6 |      | 
+//          +---+             +---+      | 
+//                                       |
+//                                       V
+//                                       x
+
+
+// ORIENTED_UP      ORIENTED_RIGHT     ORIENTED_DOWN      ORIENTED_LEFT
+// z <--------+     z <--------+       z <--------+       z <--------+
+//      |  ^  |          |     |            |     |            |     |
+//      |  |  |          | --> |            |  |  |            | <-- |
+//      |     |          |     |            |  V  |            |     |
+//      +-----+          +-----+            +-----+            +-----+
+//            |                |                  |                  |
+//            V                V                  V                  V
+//            x                x                  x                  x
+
 // Rotation Events
 #define ROTATION_EVENT_COUNT 4
 const char* rotation_events[ROTATION_EVENT_COUNT] = { "+x", "-x", "+z", "-z" }; 
 
 typedef enum {
-	X_POSITIVE=0, X_NEGATIVE, Z_POSITIVE, Z_NEGATIVE, INVALID
-} rotation_axis;
+	X_POSITIVE=0, X_NEGATIVE, Z_POSITIVE, Z_NEGATIVE, INVALID, Y_POSITIVE, Y_NEGATIVE
+} Axis;
 
 #define x_pos rotation_events[X_POSITIVE]
 #define x_neg rotation_events[X_NEGATIVE]
@@ -82,14 +112,14 @@ void init_state_map() {
 	}
 }
 
-rotation_axis get_rotation_axis(const char* ra) {
+Axis get_rotation_axis(const char* ra) {
 	if (strcmp(ra, x_pos) == 0) return X_POSITIVE;
 	if (strcmp(ra, x_neg) == 0) return X_NEGATIVE;
 	if (strcmp(ra, z_pos) == 0) return Z_POSITIVE;
 	if (strcmp(ra, z_neg) == 0) return Z_NEGATIVE;
 	return INVALID;
 }
-const char* get_rotation_axis_str(rotation_axis ra) {
+const char* get_rotation_axis_str(Axis ra) {
 	if (ra == X_POSITIVE) return x_pos;
 	if (ra == X_NEGATIVE) return x_neg;
 	if (ra == Z_POSITIVE) return z_pos;
@@ -97,7 +127,7 @@ const char* get_rotation_axis_str(rotation_axis ra) {
 	return "Invalid";
 }
 
-int get_next_rotation_state(const char* current_state, rotation_axis axis, RotationEntry* rot_info) {
+int get_next_rotation_state(const char* current_state, Axis Axis, RotationEntry* rot_info) {
 	
 	int index = shget(rotation_state_map, current_state);
 	
@@ -105,11 +135,11 @@ int get_next_rotation_state(const char* current_state, rotation_axis axis, Rotat
 		/* printf("ERROR: State not found!\n"); */
 		return -1;
 	}
-	if (axis < X_POSITIVE || axis >= INVALID) {
-		/* printf("ERROR: Invalid state axis!\n"); */
+	if (Axis < X_POSITIVE || Axis >= INVALID) {
+		/* printf("ERROR: Invalid state Axis!\n"); */
 		return -1;
 	}
-	*rot_info = rotation_table[index][axis];
+	*rot_info = rotation_table[index][Axis];
 	return 0;
 }
 
@@ -117,21 +147,21 @@ int get_next_rotation_state(const char* current_state, rotation_axis axis, Rotat
 char state[32];
 char tg_face[16];
 char ls_face[16];
-char axis[32];
+char Axis[32];
 
 void rotate_cube() {
 	
-	size_t len = strlen(axis);
-	if (len > 0 && axis[len - 1] == '\n') {
+	size_t len = strlen(Axis);
+	if (len > 0 && Axis[len - 1] == '\n') {
 		// Remove newline character if present
-		axis[len - 1] = '\0';
+		Axis[len - 1] = '\0';
 	}
 			
-	if (strcmp(axis, "q") == 0) {
+	if (strcmp(Axis, "q") == 0) {
 		exit(0);
 	}
 			
-	rotation_axis rot_axis = get_rotation_axis(axis);
+	Axis rot_axis = get_rotation_axis(Axis);
 	RotationEntry rot_info;
 	int result = get_next_rotation_state(state, rot_axis, &rot_info);
 	if (result == 0) {
@@ -155,8 +185,8 @@ int main() {
 		for (size_t i=0; i<strlen(state);i++) { printf("-");}
 		printf("\n");
 		printf("state:%s | tg_face:%s | ls_face:%s\n", state, tg_face, ls_face);
-		printf("Enter axis:");
-		if (fgets(axis, sizeof(axis), stdin) != NULL) {
+		printf("Enter Axis:");
+		if (fgets(Axis, sizeof(Axis), stdin) != NULL) {
 			rotate_cube();
 		} else {
 			printf("Error reading input!\n");
