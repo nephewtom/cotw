@@ -107,7 +107,7 @@ typedef struct {
 rotation_state_entry* rotation_state_map = NULL; // stb_ds hash table
 void init_state_map() {
 	for (int i = 0; i < ROTATION_STATE_COUNT; i++) {
-		printf("state[%d]=%s\n", i, rotation_states[i]);
+		// printf("state[%d]=%s\n", i, rotation_states[i]);
 		shput(rotation_state_map, rotation_states[i], i);
 	}
 }

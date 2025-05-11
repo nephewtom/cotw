@@ -1,6 +1,9 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "raylib.h"
 #include "raymath.h"
-#include <cstring>
 #define SUPPORT_TRACELOG
 #define SUPPORT_TRACELOG_DEBUG
 #include "utils.h"
@@ -10,46 +13,191 @@
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
 
+struct CellPos {
+	int x;
+	int z;
+};
+
 // ---------------------------------------------------------------------------------------
 // Words
 // ---------------------------------------------------------------------------------------
 Font fontBubble;
 struct Word {
+	char* text;
+	
 	Model model;
+
 	Texture2D texture;
+	Vector2 offset;
 	Image wordImage;
 	Image blankImage;
 	
-	void init(const char* text, Vector2 position) {
-		
-		// RLAPI void ImageDrawTextEx(Image *dst, Font font, const char *text, 
-		//                            Vector2 position, float fontSize, float spacing, Color tint);
+	CellPos cellPos;
+	
+	void init(const char* word) {
+		text = strdup(word);
+		TRACELOGD("Word:%s, ", text);
 		blankImage = GenImageColor(120, 120, BLANK);
-		
-		wordImage = GenImageColor(120, 120, BLANK);
-		ImageDrawTextEx(&wordImage, fontBubble, text, position, (float) fontBubble.baseSize/2, 0.0f, BLACK);
-		
-		texture = LoadTextureFromImage(wordImage);
 		
 		Mesh planeMesh = GenMeshPlane(2.0, 2.0, 1, 1);
 		model = LoadModelFromMesh(planeMesh);
+	}
+	
+	// offset - 2D offset in the 2D texture from top-left corner	
+	void applyTexture() {
+		wordImage = GenImageColor(120, 120, BLANK);
+		// RLAPI void ImageDrawTextEx(Image *dst, Font font, const char *text, 
+		//                            Vector2 position, float fontSize, float spacing, Color tint);
+		ImageDrawTextEx(&wordImage, fontBubble, text, offset, (float) fontBubble.baseSize/2, 0.0f, BLACK);
+		texture = LoadTextureFromImage(wordImage);
+		
 		for (int i=0; i<model.materialCount; i++) {
 			model.materials[i].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
 			model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = texture;
 		}
 	}
-	
+
 	void pickup() {
-		// the word disappears on the ground
+		// Pick up the word, so it disappears from the ground
 		UpdateTexture(texture, blankImage.data);
 	}
 	
 	void release() {
-		// the word appears on the ground
+		// Release the word, so it appears on the ground
 		UpdateTexture(texture, wordImage.data);		
 	}
+	
+	void draw() {
+		// cell positions are multiplied per 2 to match space coordinates
+		DrawModel(model, {(float)2*cellPos.x, 0.1, (float)2*cellPos.z}, 1.0, WHITE);
+	}
+	
+	void unload() {
+		free(text);
+		UnloadModel(model);
+		UnloadTexture(texture);
+		UnloadImage(wordImage);
+		UnloadImage(blankImage);
+	}
 };
+
 Word wordCube;
+
+int countWords(const char *text) {
+    int count = 0;
+    bool inWord = false;
+
+	for (const char *c = text; *c; c++) {
+		if (*c != ' ' && *c != '\t' && *c != '\n') {
+			if (!inWord) {
+				count++;
+				inWord = true;
+			}
+        } else {
+			inWord = false;
+		}
+    }
+
+    return count;
+}
+
+
+// ---------------------------------------------------------------------------------------
+// Quotes
+// ---------------------------------------------------------------------------------------
+#include <vector>
+
+struct QuoteData {
+	const char* quote;
+	int wordCount;
+	std::vector<Vector2> offset;
+	std::vector<CellPos> cellPos;
+};
+
+enum QuoteAuthor{
+	NIKE = 0, OPUS, TEST
+};
+std::vector<QuoteData> quotesData = {
+    {
+        "Just do it", 4, 
+        { {25, 45}, {25, 45}, {25, 45} }, 
+        { {0,0}, {0,2}, {-1,1} }
+    },
+    {
+        "Life is life", 3, 
+        { {25, 45}, {25, 45}, {25, 45} }, 
+        { {1,0}, {1,1}, {1,2} }
+    },
+    {
+        "Life is my life", 4, 
+        { {25, 45}, {25, 45}, {25, 45}, {25, 45} }, 
+        { {2,0}, {2,1}, {2,2}, {2,3} }
+    }
+};
+
+struct Quote {
+	Word* words;
+	int wordCount;
+
+	void create(QuoteData& data) {
+		
+		wordCount = countWords(data.quote);
+		printf("wordCount: %i\n", wordCount);
+
+		if (wordCount != data.wordCount) {
+			TRACELOG(LOG_ERROR, "Mismatch in wordCount!");
+			TRACELOG(LOG_ERROR, "quote: %s", data.quote);
+		}
+
+		initWords(data.quote);
+		for (int i=0; i<wordCount; i++) {
+			words[i].offset = data.offset[i];
+			words[i].applyTexture();
+			words[i].cellPos = data.cellPos[i];
+		}
+	}
+
+	void draw() {
+		for (int i=0; i<wordCount; i++) {
+			words[i].draw();			
+		}
+	}
+	
+	void unload() {
+		for (int i=0; i<wordCount; i++) {
+			words[i].unload();
+		}
+	}
+	
+	void initWords(const char *text) {
+	
+		words = (Word*) malloc(sizeof(Word) * wordCount);
+		if (!words) { 
+			fprintf(stderr, "Words allocation failed!\n");
+			exit(-1);
+		}
+	
+		char* buffer = strdup(text);
+		if (!buffer) {
+			fprintf(stderr, "strdup failed!\n");
+			free(words);
+			exit(-1);
+		}
+	
+		int index = 0;
+		char *token = strtok(buffer, " \n\t");
+		while (token && index < wordCount) {
+		
+			Word *w = &words[index];
+			w->init(token);
+
+			index++;
+			token = strtok(NULL, " \n\t");
+		}
+	}
+};
+
+Quote quote;
 
 
 // ---------------------------------------------------------------------------------------
@@ -66,11 +214,6 @@ struct RotationInfo {
 
 enum MoveDirection {
 	NONE, FORWARD_MOVE, BACKWARD_MOVE, RIGHT_MOVE, LEFT_MOVE
-};
-
-struct CellPos {
-	int x;
-	int z;
 };
 
 struct Cube {
@@ -169,7 +312,7 @@ void Cube::init(Vector3 initPos, bool smoothBehaviour) {
 	numbersTex = LoadTexture("./assets/cube-numbers.png");
 	
 	position = initPos; // it is moved 1.0f in y so it stays on the floor
-	cellPos = { (int)position.x/2 + 1, (int)position.z/2 + 1};
+	cellPos = { (int)position.x/2, (int)position.z/2 };
 
 	transforms = MatrixIdentity();
 	
@@ -281,7 +424,7 @@ void Cube::updateSliding(float delta) {
 		
 		if (animationProgress >= 1.0f) {
 			position = endPosition;
-			cellPos = { (int)position.x/2 + 1, (int)position.z/2 + 1};
+			cellPos = { (int)position.x/2, (int)position.z/2 };
 			isSliding = false;
 			animationProgress = 0.0f;			
 		}
@@ -366,7 +509,7 @@ void Cube::updateRolling(float delta) {
 		if (animationProgress >= 1.0f) {
 
 			position = endPosition;
-			cellPos = { (int)position.x/2 + 1, (int)position.z/2 + 1};
+			cellPos = { (int)position.x/2, (int)position.z/2};
 
 			isRolling = false;
 			animationProgress = 0.0f;
@@ -518,6 +661,34 @@ Camera3D poseCamera;
 RenderTexture poseRenderTexture;
 Rectangle poseRect = { 0.0f, 0.0f, 300, -168 };
 
+
+void drawGrid(int slices, float spacing)
+{
+    int halfSlices = slices/2;
+
+    rlBegin(RL_LINES);
+	for (int i = -halfSlices; i <= halfSlices; i++)
+	{
+		if (i == 0)
+		{
+			rlColor3f(0.5f, 0.5f, 0.5f);
+		}
+		else
+		{
+			rlColor3f(0.75f, 0.75f, 0.75f);
+		}
+
+		rlVertex3f((float)i*spacing+1, 0.0f, (float)-halfSlices*spacing);
+		rlVertex3f((float)i*spacing+1, 0.0f, (float)halfSlices*spacing);
+
+		rlVertex3f((float)-halfSlices*spacing, 0.0f, (float)i*spacing+1);
+		rlVertex3f((float)halfSlices*spacing, 0.0f, (float)i*spacing+1);
+	}
+    rlEnd();
+}
+
+
+
 // Draw coordinate axes with cones
 void drawAxis(Vector3 p, float axisLength, float axisRadius, float coneLength, float coneRadius) { 
 	// X axis (red)
@@ -611,9 +782,10 @@ void draw() {
 		cube.draw();	
 		rlSetLineWidth(lineWidth);
 		
-		DrawModel(wordCube.model, {1, 0, 1}, 1.0, WHITE);
+		wordCube.draw();
+		quote.draw();
 		
-		DrawGrid(10, 2.0f);
+		drawGrid(10, 2.0f);
 		drawAxis({0,0,0});
 	}
 	EndMode3D();
@@ -629,7 +801,7 @@ void draw() {
 	}
 	
 	// Draw up-right BLUE cube with axis with renderTexture
-	DrawTextureRec(poseRenderTexture.texture, poseRect, (Vector2){960.0f, 20.0f}, WHITE);
+	DrawTextureRec(poseRenderTexture.texture, poseRect, {960.0f, 20.0f}, WHITE);
 	DrawRectangleLines(960, 20, 300, 168, GREEN);
 	
 	drawText();
@@ -678,17 +850,17 @@ void buildTexturePose() {
 }
 
 void initWorld() {
-	camera.position = (Vector3){ 3.0f, 10.0f, 12.0f };
-	camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-	camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+	camera.position = { 3.0f, 10.0f, 12.0f };
+	camera.target = { 0.0f, 0.0f, 0.0f };
+	camera.up = { 0.0f, 1.0f, 0.0f };
 	camera.fovy = 45.0f;
 	camera.projection = CAMERA_PERSPECTIVE;
 
-	cube.init({5, 1, 1}, true);
+	cube.init({4, 1, 0}, true);
 	
-	poseCamera.position = (Vector3){ 1.5f, 1.5f, 1.5f };
-	poseCamera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-	poseCamera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+	poseCamera.position = { 1.5f, 1.5f, 1.5f };
+	poseCamera.target = { 0.0f, 0.0f, 0.0f };
+	poseCamera.up = { 0.0f, 1.0f, 0.0f };
 	poseCamera.fovy = 45.0f;
 	poseCamera.projection = CAMERA_PERSPECTIVE;
 	poseRenderTexture = LoadRenderTexture(300, 168);
@@ -697,7 +869,14 @@ void initWorld() {
 	fontBubble = LoadFontEx("./assets/Game Bubble.ttf", 64, 0, 0);
 	// fontKaisg = LoadFontEx("./assets/KAISG.ttf", 64, 0, 0);
 	
-	wordCube.init("Cube", {25, 45});
+	wordCube.init("Cube");
+	wordCube.cellPos = { -2, -2 };
+	wordCube.offset = {25.0f, 45.0f};
+	wordCube.applyTexture();
+	
+	quote.create(quotesData[NIKE]);
+	   
+	fflush(stdout);
 }
 
 
@@ -738,6 +917,7 @@ int main(void)
 	while (!WindowShouldClose()) {
 		updateFrameWindow();
 	}
+	
 	CloseWindow();
 #endif		
     

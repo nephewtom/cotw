@@ -1,7 +1,33 @@
-* TODO Know which face is on the ground
+* DONE Know which face is on the ground
 And in which orientation it is
 
-* Modify image&texture with word and revert it
+* IN-PROGRESS Pick/release word from ground
+  - Assign a key to do it and a state variable
+  - Add an visual effect for it
+
+* TODO Incorporate from rolling cube:
+  - mouse/camera movement
+  - cube direction of movement 
+
+* TODO Allow to change movement before hitting ground
+  It feel more natural and cool...
+
+* IN-PROGRESS Images & texture with words
+  - Think what it is needed:
+    + invert image?
+    + tg_face orientation to align
+    + other?
+
+* TODO Learn to program shaders
+One bit at a time
+
+* TODO Final ground space to put the quote/words
+
+* TODO Better visual ground (grass/others?)
+   Could change depending on the level.
+
+* TODO Cubemap
+   Depending on the level?
 
 * Shader with normal map that makes words bump?
 
