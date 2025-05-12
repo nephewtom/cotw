@@ -59,8 +59,11 @@ const char* rotation_states[ROTATION_STATE_COUNT] = {
 // Rotation Table
 typedef struct {
 	const char* state;
-	const char* tg_face; // touching ground face
-	const char* ls_face; // looking sky face
+	const char* TG_face; // Touching Ground face
+	const char* LS_face; // looking Sky face
+	// TODO: change const char* by ints or char? Like TG_face = 1-5 & TG_orientation= U/D/R/L ? 
+	// int TG_face;
+	// int TG_orientation;
 } RotationEntry;
 
 RotationEntry rotation_table[ROTATION_STATE_COUNT][ROTATION_EVENT_COUNT] = {
@@ -145,8 +148,8 @@ int get_next_rotation_state(const char* current_state, Axis Axis, RotationEntry*
 
 #if 0
 char state[32];
-char tg_face[16];
-char ls_face[16];
+char TG_face[16];
+char LS_face[16];
 char Axis[32];
 
 void rotate_cube() {
@@ -166,10 +169,10 @@ void rotate_cube() {
 	int result = get_next_rotation_state(state, rot_axis, &rot_info);
 	if (result == 0) {
 		printf("-> rot_info: (%s, %s, %s)\n", 
-			   rot_info.state, rot_info.tg_face, rot_info.ls_face);
+			   rot_info.state, rot_info.TG_face, rot_info.LS_face);
 		strcpy(state, rot_info.state);
-		strcpy(tg_face, rot_info.tg_face);
-		strcpy(ls_face, rot_info.ls_face);
+		strcpy(TG_face, rot_info.TG_face);
+		strcpy(LS_face, rot_info.LS_face);
 	}
 }
 
@@ -177,14 +180,14 @@ int main() {
 	init_state_map();
 	
 	strcpy(state, "i");
-	strcpy(tg_face, "6D");
-	strcpy(ls_face, "1U");
+	strcpy(TG_face, "6D");
+	strcpy(LS_face, "1U");
 		
 	while (true) {
 		printf("--------------------------------");
 		for (size_t i=0; i<strlen(state);i++) { printf("-");}
 		printf("\n");
-		printf("state:%s | tg_face:%s | ls_face:%s\n", state, tg_face, ls_face);
+		printf("state:%s | TG_face:%s | LS_face:%s\n", state, TG_face, LS_face);
 		printf("Enter Axis:");
 		if (fgets(Axis, sizeof(Axis), stdin) != NULL) {
 			rotate_cube();

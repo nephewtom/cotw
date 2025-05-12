@@ -1,37 +1,202 @@
 * DONE Know which face is on the ground
-And in which orientation it is
+   And in which orientation it is.
 
 * IN-PROGRESS Pick/release word from ground
   - Assign a key to do it and a state variable
   - Add an visual effect for it
-
-* TODO Incorporate from rolling cube:
-  - mouse/camera movement
-  - cube direction of movement 
-
-* TODO Allow to change movement before hitting ground
-  It feel more natural and cool...
-
+  
 * IN-PROGRESS Images & texture with words
   - Think what it is needed:
     + invert image?
     + tg_face orientation to align
     + other?
 
-* TODO Learn to program shaders
-One bit at a time
+
+* TODO Incorporate from rolling cube:
+** rlImGui for better debugging + bigger resolution 1920x1080
+** mouse/camera movement
+** cube direction of movement 
+** console log with colors
+
+* TODO Add gamepad support
+* TODO Allow to change movement before hitting ground
+  It feel more natural and cool...
 
 * TODO Final ground space to put the quote/words
-
 * TODO Better visual ground (grass/others?)
    Could change depending on the level.
 
 * TODO Cubemap
    Depending on the level?
 
-* Shader with normal map that makes words bump?
+
+* TODO Learn shaders, one bit at a time
+** Exercise to draw a glow or outline effect with a cube and sphere:
+#+begin_example 12 May 2025
+Nahua — 5:10 PM
+I'm wondering how I could make a 3D object glow with an outline when I hover the mouse over it (highlighting) with Raylib. What are some concepts I'd need to be familiar with? Does anyone have any good resources they'd recommend? Thanks 
+JeffM — 5:10 PM
+you'd do that in a shader
+look up sobel edge detection
+or draw it to a render texture, then put the glow on the render texture with a shader after you draw it.
+Nahua — 5:16 PM
+Is this approach similar to the post-processing example? And thank you for the hints! 
+JeffM — 5:18 PM
+yes
+
+you can patch out just the ones you need for updates
+nephewtom — 5:51 PM
+I was going to ask about this...
+I played around postprocessing examples, but those render the complete scene.
+In the case for effects as glow or similar in a specific object... 
+JeffM — 5:51 PM
+you'd have to render the object to it's own little render texture
+then glow that
+then draw that render texturure to the scene
+a glow shader is somewhat complex
+nephewtom — 5:52 PM
+well @Bigfoot71 has it implemented in r3d...
+JeffM — 5:52 PM
+then you should totally go see what they did
+and just do that
+nephewtom — 5:53 PM
+sorry, i am a bit slow on this...
+JeffM — 5:53 PM
+there are many ways to do it
+if they have a solution you like just pull that out and into your code
+nephewtom — 5:55 PM
+yeah, i have tried to learn shaders several times, and found it a bit hard... 
+you have to change the traditional way of looking at things.
+JeffM — 5:56 PM
+there is always a shader involved
+if you mean '1995' as traditional, then yes
+nephewtom — 5:56 PM
+yep, i am old... 😂
+JeffM — 5:56 PM
+yeah, you are not doing pixel operations
+the GPU can only draw geometry
+and the vertex and fragment shaders are always a part of the pipeline
+you can't really 'plot a pixel'
+you can draw geometry that covers a screen space fragment, and then use a shader to determine what color those fragments are
+nephewtom — 5:58 PM
+i learnt graphics programming rendering pixels in assembler in an AmstradCPC...
+that old...
+JeffM — 5:58 PM
+yeah, that's not useful
+you have to think of the GPU as another computer
+and you program it how to draw
+your game provides the input
+and the GPU program turns that into pixels
+nephewtom — 6:00 PM
+if i understand it, the key is that the shader only applies to the specific object...
+JeffM — 6:00 PM
+depends what shader you are talking about
+a shader program is made of 2 shaders, vertex and fragment
+there is always one shader program active at a time
+nephewtom — 6:00 PM
+yep, i know that
+JeffM — 6:01 PM
+all draw calls (triangles) are processed through the current shader program
+so when you draw geometry, first it's vertex data is processed by the vertex shader and turned into screen space verts
+then the GPU driver will rasterize those screen space triangles into fragments (pixels).
+then for each fragment, it is processed by the current fragment shader to get the color of that pixel
+then that pixel is blended to the current render target
+nephewtom — 6:02 PM
+yes, all that theory i know
+let me think an very easy example so i can expose my doubts
+JeffM — 6:02 PM
+trying to 'draw' in the fragment shader is like trying to draw the mona-lisa with just a function like this.
+
+Color GetPixelColor(int x, int y);
+the fragment shaders' job is to just compute a color
+so for many effects you have to think about it backwards.
+you can't just think about the output you want, you need to figure out how to get that output from the little input you have
+so the tough bit for an outline shader is, if you want to set pixel data that is outside of the geometry you send, the fragment shader will never be called for those pixels. You then have to come up with some way to get a shader called for those pixels, and that's why post processing is common, you can simply draw a quad over the entire area with the input pixels as a texture, then the fragment shader becomes much closer to a 'pixel fliter' kind of operation
+but that means you need to have the source pixels generated before the shader runs, thus the render texture
+JeffM — 6:13 PM
+if your objects are convex, there is the cheap and easy way to get an outline :), scale the mesh by a small bit and reverse it's culling, then draw it in in a solid color
+nephewtom — 6:14 PM
+aha... honestly i am a bit overwhelmed now...
+JeffM — 6:14 PM
+yeah, it's a big thing to get used to
+took me ages, and I only just now scratch the surface
+it helps to understand the graphics pipeline
+nephewtom — 6:15 PM
+yep, i know that feeling...
+The example would be as simple as having a camera looking at a sphere and a cube.
+The cube has no effect but the sphere has a glow effect or an outline shader... 
+(may be i am too noob and a glow and a different outline shader can not be group together...)
+
+The camera can move so sometimes one is behind the other an viceversa.
+I can do it using r3d, but i have that feeling that i do not know what i am really doing...
+
+I will put it as a personal exercise, because the only way to learn this stuff is to try and keep trying.
+If i don't get it, i will come back here for help.
+JeffM — 6:18 PM
+in the end, the shaders themseves do very simple things, transform a vert, select a color.  It's us that has to figure out how to do the magic using those simple API.s
+nephewtom — 6:19 PM
+it is something i will need for a small game i am crafting, but at this point i am working in the gameplay part
+JeffM — 6:19 PM
+r3d is more like a full rendering engine with a scenegraph and a complex lighting setup
+I would see how they handle the outline
+if it's done as part of the shader for the sphere, or done as a post processes
+I don't recall if r3d is doing differed rendering or not, bcause that is it's own entirely different thing
+
+#+end_example
+
+** Videos & Articles
+  - Tsoding: How to Draw Lines with Shaders? 
+    https://www.youtube.com/watch?v=cU5WcrU_YI4
+
+  - Articles
+    https://gamedevelopment.tutsplus.com/a-beginners-guide-to-coding-graphics-shaders--cms-23313t
+
+    https://www.reddit.com/r/opengl/comments/2gh77v/help_am_i_so_stupid_or_its_really_hard_to/
+
+  - Web sites to code shaders
+    https://twigl.app/
+    https://pongasoft.github.io/webgpu-shader-toy/
+
+  - Grid shader  
+    https://dev.to/javiersalcedopuyo/simple-infinite-grid-shader-5fah
+    https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
+
+  - Shadered:
+    https://shadered.org/shaders?query=&sort=hot&page=1
+
+
+* TRY Shader with normal map that makes words bump?
+
+* Wookash Podcast
+  - Painting with Math | Inigo Quilez
+    https://www.youtube.com/watch?v=F1ax1iJTHFs
+  
+  - On math, shaders and burnout with Freya Holmér!
+    https://www.youtube.com/watch?v=1o73moRXLAA
+
+* Clay with Raylib
+   https://github.com/nicbarker/clay?tab=readme-ov-file
+   https://github.com/nicbarker/clay/tree/main/examples
+   
+* C strings sample in godbolt with disassembly
+   https://godbolt.org/z/os8h5rh9q
+
+   C3 language: https://c3-lang.org/
+
+
+* Blender - cube animation
+   https://www.youtube.com/watch?v=AEAc_lLjOMc
+   https://www.patreon.com/posts/beginner-in-88470676
+
+
+* Yasnippet
+https://www.reddit.com/r/emacs/comments/1b6l4nj/yasnippet_vs_treesit_c_snippets_in_ctsmode/
+https://www.youtube.com/watch?v=W-bRZlseNm0
+https://github.com/AndreaCrotti/yasnippet-snippets
+   
 
 * Quotes:
+https://medium.com/@anferneeck/70-short-and-simple-life-quotes-71cb8f8b78f3
 #+begin_example
 An unexamined life is not worth living
 - Socrates
