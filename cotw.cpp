@@ -34,10 +34,10 @@ void initFont() {
 }
 
 // #define CELL_IMAGE_SIZE 120
-// const int CELL_IMAGE_SIZE = 120; // in pixels
-// #define FONT_SIZE fontBubble.baseSize/2;
-const int CELL_IMAGE_SIZE = 480; // in pixels
-#define FONT_SIZE (float)4*fontBubble.baseSize/2
+const int CELL_IMAGE_SIZE = 120; // in pixels
+#define FONT_SIZE (float)fontBubble.baseSize/2
+// const int CELL_IMAGE_SIZE = 480; // in pixels
+// #define FONT_SIZE (float)4*fontBubble.baseSize/2
 
 struct Word {
 	char* text;
@@ -63,7 +63,7 @@ struct Word {
 		onCube = false;
 	}
 	
-	// offset - 2D offset in the 2D texture from top-left corner	
+	// offset - 2D offset from top-left corner to apply the text in the texture  
 	void applyTexture() {
 		wordImage = GenImageColor(CELL_IMAGE_SIZE, CELL_IMAGE_SIZE, BLANK);
 		// RLAPI void ImageDrawTextEx(Image *dst, Font font, const char *text, 
@@ -164,7 +164,6 @@ std::vector<QuoteData> quotesData = {
 		{ {0.2, 0.375}, {0.2, 0.375}, {0.2, 0.375}, {0.2, 0.375}, {0.2, 0.375}, {0.2, 0.375} },
 		{ {2,0}, {2,1}, {2,2}, {2,3}, {2,3}, {2,3} }
     }
-	
 };
 
 struct Quote {
@@ -216,14 +215,14 @@ struct Quote {
 			exit(-1);
 		}
 	
-		int index = 0;
+		int wIndex = 0;
 		char *token = strtok(buffer, " \n\t");
-		while (token && index < wordCount) {
+		while (token && wIndex < wordCount) {
 		
-			Word *w = &words[index];
+			Word *w = &words[wIndex];
 			w->init(token);
 
-			index++;
+			wIndex++;
 			token = strtok(NULL, " \n\t");
 		}
 	}
@@ -297,15 +296,15 @@ struct Cube {
 	void updateRolling(float);
 	void draw();
 	
-	
-	Texture2D numbersTex;
-	Texture2D defaultTex;
-	bool useNumbersTex = false;
+	Texture2D numbersTexture;
+	bool useNumbersTexture = false;
 	void swapTexture();
 	
-	Texture2D wordsTex;
+	Texture2D wordsTexture;
+	Image plainImage;
 	Image wordsImage;
-	void drawWordsTex();
+	void debugDrawWordsTex();
+	
 	RotationInfo rotationInfo;
 
 	bool isPicking = false;
@@ -321,14 +320,20 @@ struct Cube {
 	PickingAnim picking;
 	void setScaleAxis();
 	
+	void pickupWord();
+	void releaseWord();
+	// void 
+	
+	
 	CellPos cellPos;
 	int wordIndexOnGround; // wordIndex in quote or -1 if there is no word under cube
-	int updateWordIndexOnGround(); // updates the word index in quote or -1 if not found
+	int updateWordIndexOnGround(); // updates the word wIndex in quote or -1 if not found
 	bool isWordOnGround();
 	
-	int	wordIndexAtFace[7]; // 0 element is not used, so the index matches with faces 1-6
+	int	wordIndexAtFace[7]; // 0 element is not used, so the wIndex matches with faces 1-6
 	bool isWordOnTouchingGroundFace();
 	
+	void drawWordsInTexture();
 	
 	Sound rollWav;
 	Sound slideWav;
@@ -342,12 +347,14 @@ void Cube::init(Vector3 initPos, bool smoothBehaviour) {
 
 	model = LoadModel("assets/cube-of-the-words.gltf"); // model cube is size 2x2
 
-	wordsImage = LoadImage("./assets/cube-plain.png");
-	wordsTex = LoadTextureFromImage(wordsImage);
+	plainImage = LoadImage("./assets/cube-plain.png");
+	wordsImage = ImageCopy(plainImage);
+	wordsTexture = LoadTextureFromImage(wordsImage);
+	
 	for (int i=0; i < model.materialCount; i++) {
-		model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = wordsTex;
+		model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = wordsTexture;
 	}
-	numbersTex = LoadTexture("./assets/cube-numbers.png");
+	numbersTexture = LoadTexture("./assets/cube-numbers.png");
 	
 	position = initPos; // it is moved 1.0f in y so it stays on the floor
 	cellPos = { (int)position.x/2, (int)position.z/2 };
@@ -378,14 +385,14 @@ void Cube::init(Vector3 initPos, bool smoothBehaviour) {
 }
 
 void Cube::swapTexture() {
-	useNumbersTex = !useNumbersTex;
+	useNumbersTexture = !useNumbersTexture;
 	for (int i=0; i < model.materialCount; i++) {
-		model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = useNumbersTex ? numbersTex : wordsTex;
+		model.materials[i].maps[MATERIAL_MAP_ALBEDO].texture = useNumbersTexture ? numbersTexture : wordsTexture;
 	}
 }
 
-void Cube::drawWordsTex() {
-	DrawTextureV(useNumbersTex ? numbersTex : wordsTex, {20, 460}, WHITE);
+void Cube::debugDrawWordsTex() {
+	DrawTextureV(useNumbersTexture ? numbersTexture : wordsTexture, {20, 460}, WHITE);
 }
 
 void Cube::handleInput() {
@@ -405,33 +412,48 @@ void Cube::handleWordsInput() {
 		if (isWordOnGround() && isWordOnTouchingGroundFace()) {
 			// there is a word on the ground AND the cube has a word in its Touching Ground face
 			PlaySound(errorWav);
+			
 		} else if (!isWordOnGround() && !isWordOnTouchingGroundFace()) {
 			// there is no word on the ground AND the cube has not word in its TG face
 			PlaySound(errorWav);
-		} else if (isWordOnGround()) {
-			// the cube picks up the word
-			int groundFaceIndex = rotationInfo.TG_face[0] - '0';
-			wordIndexAtFace[groundFaceIndex] = wordIndexOnGround;
 			
-			Word& word = quote.words[wordIndexOnGround];
-			wordIndexOnGround = -1;
-
-			word.pickup();
-			PlaySound(pickupWav);
+		} else if (isWordOnGround()) {
+			pickupWord();
 			
 		} else if (isWordOnTouchingGroundFace()) {
-			// the cube releases the word on the ground
-			int groundFaceIndex = rotationInfo.TG_face[0] - '0';
-			wordIndexOnGround = wordIndexAtFace[groundFaceIndex];
-			wordIndexAtFace[groundFaceIndex] = -1;
-			
-			Word& word = quote.words[wordIndexOnGround];
-			word.release(cellPos);
-			PlaySound(releaseWav);
+			releaseWord();
 		}
 		
 		picking.progress = 0.0f;
 	}
+}
+
+void Cube::pickupWord() {
+
+	int groundFaceIndex = rotationInfo.TG_face[0] - '0';
+	wordIndexAtFace[groundFaceIndex] = wordIndexOnGround;
+			
+	Word& word = quote.words[wordIndexOnGround];
+	wordIndexOnGround = -1;
+
+	word.pickup();
+	PlaySound(pickupWav);
+	
+	drawWordsInTexture();
+}
+
+void Cube::releaseWord() {
+
+	// the cube releases the word on the ground
+	int groundFaceIndex = rotationInfo.TG_face[0] - '0';
+	wordIndexOnGround = wordIndexAtFace[groundFaceIndex];
+	wordIndexAtFace[groundFaceIndex] = -1;
+			
+	Word& word = quote.words[wordIndexOnGround];
+	word.release(cellPos);
+	PlaySound(releaseWav);
+	
+	drawWordsInTexture();
 }
 
 bool Cube::isWordOnTouchingGroundFace() {
@@ -452,6 +474,36 @@ int Cube::updateWordIndexOnGround() {
 		}
 	}
 	return -1;
+}
+
+void Cube::drawWordsInTexture() {
+	
+	UnloadImage(wordsImage);
+	wordsImage = ImageCopy(plainImage);
+	
+	for (int face=1; face<7; face++) {
+		int wIndex = wordIndexAtFace[face];
+		// TRACELOGD("wordIndexAtFace[%i]:%i", face, wIndex);
+		if (wIndex == -1) continue;
+		
+		Word& word = quote.words[wIndex];
+		if (word.onCube) {
+			TRACELOGD("Drawing on face:%i | text:%s", face, word.text);
+
+			// TODO: the added values depend on the size of image
+			// Update them accordingly. Move to other place as constant if necessary
+			Vector2 offset;
+			if (face == 1) { offset = word.offset;}
+			else if (face == 2 ) { offset = Vector2Add({ 120, 0 }, word.offset);}
+			else if (face == 3 ) { offset = Vector2Add({ 240, 0 }, word.offset);}
+			else if (face == 4 ) { offset = Vector2Add({ 0, 120 }, word.offset);}
+			else if (face == 5 ) { offset = Vector2Add({ 120, 120 }, word.offset);}
+			else if (face == 6 ) { offset = Vector2Add({ 240, 120 }, word.offset);}
+			
+			ImageDrawTextEx(&wordsImage, fontBubble, word.text, offset, FONT_SIZE, 0.0f, BLACK);
+		}
+	}
+	UpdateTexture(wordsTexture, wordsImage.data);
 }
 
 void Cube::handleSlideInput() {
@@ -516,263 +568,263 @@ void Cube::updateSliding(float delta) {
 	}
 }
 
-	void Cube::handleRollInput() {
-		MoveDirection inputDirection = 
-			IsKeyPressed(KEY_W) ? FORWARD_MOVE :
-			IsKeyPressed(KEY_A) ? LEFT_MOVE :
-			IsKeyPressed(KEY_S) ? BACKWARD_MOVE :
-			IsKeyPressed(KEY_D) ? RIGHT_MOVE :
-			NONE;
+void Cube::handleRollInput() {
+	MoveDirection inputDirection = 
+		IsKeyPressed(KEY_W) ? FORWARD_MOVE :
+		IsKeyPressed(KEY_A) ? LEFT_MOVE :
+		IsKeyPressed(KEY_S) ? BACKWARD_MOVE :
+		IsKeyPressed(KEY_D) ? RIGHT_MOVE :
+		NONE;
 
-		if (!isRolling && !isSliding && inputDirection != NONE) {
+	if (!isRolling && !isSliding && inputDirection != NONE) {
 
-			Vector3 offset; // offset for rotationOrigin
-			Vector3 translation; // due to rotation, it gets translated
+		Vector3 offset; // offset for rotationOrigin
+		Vector3 translation; // due to rotation, it gets translated
 		
-			if (inputDirection == FORWARD_MOVE) {
-				offset = {0, -1, -1};
-				rollAnim.axisV = X_VECTOR_NEGATIVE;
-				rollAnim.axis = X_NEGATIVE;
-				translation = {0, 0, -2};
-			}
-			else if (inputDirection == BACKWARD_MOVE) {
-				offset = {0, -1, 1};
-				rollAnim.axisV = X_VECTOR_POSITIVE;
-				rollAnim.axis = X_POSITIVE;
-				translation = {0, 0, 2};
-			}		
-			else if (inputDirection == LEFT_MOVE) {
-				offset = {-1, -1, 0};
-				rollAnim.axisV = Z_VECTOR_POSITIVE;
-				rollAnim.axis = Z_POSITIVE;
-				translation = {-2, 0, 0};
-			}		
-			else if (inputDirection == RIGHT_MOVE) {
-				offset = {1, -1, 0};
-				rollAnim.axisV = Z_VECTOR_NEGATIVE;
-				rollAnim.axis = Z_NEGATIVE;
-				translation = {2, 0, 0};
-			}
+		if (inputDirection == FORWARD_MOVE) {
+			offset = {0, -1, -1};
+			rollAnim.axisV = X_VECTOR_NEGATIVE;
+			rollAnim.axis = X_NEGATIVE;
+			translation = {0, 0, -2};
+		}
+		else if (inputDirection == BACKWARD_MOVE) {
+			offset = {0, -1, 1};
+			rollAnim.axisV = X_VECTOR_POSITIVE;
+			rollAnim.axis = X_POSITIVE;
+			translation = {0, 0, 2};
+		}		
+		else if (inputDirection == LEFT_MOVE) {
+			offset = {-1, -1, 0};
+			rollAnim.axisV = Z_VECTOR_POSITIVE;
+			rollAnim.axis = Z_POSITIVE;
+			translation = {-2, 0, 0};
+		}		
+		else if (inputDirection == RIGHT_MOVE) {
+			offset = {1, -1, 0};
+			rollAnim.axisV = Z_VECTOR_NEGATIVE;
+			rollAnim.axis = Z_NEGATIVE;
+			translation = {2, 0, 0};
+		}
 		
-			moveDirection = inputDirection;
+		moveDirection = inputDirection;
 
-			rollAnim.pivot = Vector3Add(position, offset);
-			endPosition = Vector3Add(position, translation);
-			isRolling = true;
+		rollAnim.pivot = Vector3Add(position, offset);
+		endPosition = Vector3Add(position, translation);
+		isRolling = true;
+	}
+}
+
+void Cube::updateRolling(float delta) {
+
+	if (isRolling) {
+		
+		animationProgress += delta / rollAnim.duration;
+		
+		float t = animationProgress;
+		float smoothT = t * t * (3.0f - 2.0f * t); // Smoothstep formula
+
+		if (smooth) {
+			rollAnim.angle = Lerp(0.0f, 90.0f, smoothT);
+		} else {
+			rollAnim.angle = Lerp(0.0f, 90.0f, t);
+		}
+		
+		// The cube can have suffered some rotations, so it is likely not to be in the initial rotation state.
+		// To proceed with the next rotation, first it is needed to reproduce its rotation state.
+		transformToInitalState();
+		
+		// Now the current rotation is applied using rollAnim.pivot, rollAnim.axisV and the changing rollAnim.angle
+		// Combining the matrices: first translate to rollAnim.pivot, then rotating, then translate back
+		Matrix translationToPivot = MatrixTranslate(-rollAnim.pivot.x, -rollAnim.pivot.y, -rollAnim.pivot.z);
+		Matrix rotation = MatrixRotate(rollAnim.axisV, rollAnim.angle * DEG2RAD);
+		Matrix translationBackFromPivot = MatrixTranslate(rollAnim.pivot.x, rollAnim.pivot.y, rollAnim.pivot.z);
+		
+		Matrix translationPlusRotation = MatrixMultiply(translationToPivot, rotation);
+		transforms = MatrixMultiply(transforms, translationPlusRotation);
+		transforms = MatrixMultiply(transforms, translationBackFromPivot);
+		
+		if (animationProgress >= 1.0f) {
+
+			position = endPosition;
+			cellPos = { (int)position.x/2, (int)position.z/2};
+
+			isRolling = false;
+			animationProgress = 0.0f;
+
+			// Add the finished rotation (always 90 degrees) to accumulated rotations
+			Matrix finishedRotation = MatrixRotate(rollAnim.axisV, 90.0f * DEG2RAD);
+			rotations = MatrixMultiply(rotations, finishedRotation);
+			
+			transformToInitalState();			
+			
+			get_next_rotation_state(rotationInfo.state, rollAnim.axis, &rotationInfo.entry);
+			strcpy(rotationInfo.state, rotationInfo.entry.state);
+			strcpy(rotationInfo.LS_face, rotationInfo.entry.LS_face);
+			strcpy(rotationInfo.TG_face, rotationInfo.entry.TG_face);
+
+			// set scale axis for swapping animation
+			const char *s = rotationInfo.LS_face;
+			if (s[0] == '6') picking.axis = Y_NEGATIVE;
+			if (s[0] == '1') picking.axis = Y_POSITIVE;
+			if (s[0] == '5') picking.axis = Z_POSITIVE;
+			if (s[0] == '3') picking.axis = Z_NEGATIVE;
+			if (s[0] == '2') picking.axis = X_POSITIVE;
+			if (s[0] == '4') picking.axis = X_NEGATIVE;	
+
+			
+			wordIndexOnGround = updateWordIndexOnGround();
+			
+			PlaySound(rollWav);
 		}
 	}
+}
 
-	void Cube::updateRolling(float delta) {
 
-		if (isRolling) {
+void Cube::transformToInitalState() {
+	// So, for a cube model translated in current position but with a coordinate system not rotated:
+	// 1) it has to be translated to the origin
+	// 2) rotated with the stored rotations and 
+	// 3) translated back.
+	// This is achieved with these matrix multiplications
+	Matrix translationToOrigin = MatrixTranslate(-position.x, -position.y, -position.z);
+	Matrix translationBackFromOrigin = MatrixTranslate(position.x, position.y, position.z);
+	transforms = MatrixMultiply(translationToOrigin, rotations);
+	transforms = MatrixMultiply(transforms, translationBackFromOrigin);
+}
+
+void Cube::update(float delta) {
+
+	if (isPicking)  {
+		picking.progress += delta;
+		float t = picking.progress / picking.duration;
+
+		if (t <= 1.0f) {
+			// Ease in/out with sine
+			float squash = sinf(t * PI); // Goes from 0 to 1 to 0
+			picking.currentHeight = picking.baseHeight - squash * (picking.baseHeight - picking.squashHeight);
+			picking.scale = 1.0f - squash * (1.0f - picking.squashHeight / picking.baseHeight);
 		
-			animationProgress += delta / rollAnim.duration;
-		
-			float t = animationProgress;
-			float smoothT = t * t * (3.0f - 2.0f * t); // Smoothstep formula
-
-			if (smooth) {
-				rollAnim.angle = Lerp(0.0f, 90.0f, smoothT);
-			} else {
-				rollAnim.angle = Lerp(0.0f, 90.0f, t);
-			}
-		
-			// The cube can have suffered some rotations, so it is likely not to be in the initial rotation state.
-			// To proceed with the next rotation, first it is needed to reproduce its rotation state.
-			transformToInitalState();
-		
-			// Now the current rotation is applied using rollAnim.pivot, rollAnim.axisV and the changing rollAnim.angle
-			// Combining the matrices: first translate to rollAnim.pivot, then rotating, then translate back
-			Matrix translationToPivot = MatrixTranslate(-rollAnim.pivot.x, -rollAnim.pivot.y, -rollAnim.pivot.z);
-			Matrix rotation = MatrixRotate(rollAnim.axisV, rollAnim.angle * DEG2RAD);
-			Matrix translationBackFromPivot = MatrixTranslate(rollAnim.pivot.x, rollAnim.pivot.y, rollAnim.pivot.z);
-		
-			Matrix translationPlusRotation = MatrixMultiply(translationToPivot, rotation);
-			transforms = MatrixMultiply(transforms, translationPlusRotation);
-			transforms = MatrixMultiply(transforms, translationBackFromPivot);
-		
-			if (animationProgress >= 1.0f) {
-
-				position = endPosition;
-				cellPos = { (int)position.x/2, (int)position.z/2};
-
-				isRolling = false;
-				animationProgress = 0.0f;
-
-				// Add the finished rotation (always 90 degrees) to accumulated rotations
-				Matrix finishedRotation = MatrixRotate(rollAnim.axisV, 90.0f * DEG2RAD);
-				rotations = MatrixMultiply(rotations, finishedRotation);
-			
-				transformToInitalState();			
-			
-				get_next_rotation_state(rotationInfo.state, rollAnim.axis, &rotationInfo.entry);
-				strcpy(rotationInfo.state, rotationInfo.entry.state);
-				strcpy(rotationInfo.LS_face, rotationInfo.entry.LS_face);
-				strcpy(rotationInfo.TG_face, rotationInfo.entry.TG_face);
-
-				// set scale axis for swapping animation
-				const char *s = rotationInfo.LS_face;
-				if (s[0] == '6') picking.axis = Y_NEGATIVE;
-				if (s[0] == '1') picking.axis = Y_POSITIVE;
-				if (s[0] == '5') picking.axis = Z_POSITIVE;
-				if (s[0] == '3') picking.axis = Z_NEGATIVE;
-				if (s[0] == '2') picking.axis = X_POSITIVE;
-				if (s[0] == '4') picking.axis = X_NEGATIVE;	
-
-			
-				wordIndexOnGround = updateWordIndexOnGround();
-			
-				PlaySound(rollWav);
-			}
+		} else {
+			isPicking = false;
+			picking.currentHeight = picking.baseHeight;
+			picking.scale = 1.0f;
 		}
 	}
-
-
-	void Cube::transformToInitalState() {
-		// So, for a cube model translated in current position but with a coordinate system not rotated:
-		// 1) it has to be translated to the origin
-		// 2) rotated with the stored rotations and 
-		// 3) translated back.
-		// This is achieved with these matrix multiplications
-		Matrix translationToOrigin = MatrixTranslate(-position.x, -position.y, -position.z);
-		Matrix translationBackFromOrigin = MatrixTranslate(position.x, position.y, position.z);
-		transforms = MatrixMultiply(translationToOrigin, rotations);
-		transforms = MatrixMultiply(transforms, translationBackFromOrigin);
-	}
-
-	void Cube::update(float delta) {
-
-		if (isPicking)  {
-			picking.progress += delta;
-			float t = picking.progress / picking.duration;
-
-			if (t <= 1.0f) {
-				// Ease in/out with sine
-				float squash = sinf(t * PI); // Goes from 0 to 1 to 0
-				picking.currentHeight = picking.baseHeight - squash * (picking.baseHeight - picking.squashHeight);
-				picking.scale = 1.0f - squash * (1.0f - picking.squashHeight / picking.baseHeight);
-		
-			} else {
-				isPicking = false;
-				picking.currentHeight = picking.baseHeight;
-				picking.scale = 1.0f;
-			}
-		}
 	
-		updateSliding(delta); 
-		updateRolling(delta);
-	}
+	updateSliding(delta); 
+	updateRolling(delta);
+}
 
-	void drawAxis(Vector3 position, 
-				  float axisLength = 5.0f, float axisRadius = 0.02f, 
-				  float coneLength = 0.3, float coneRadius = 0.1f);
+void drawAxis(Vector3 position, 
+			  float axisLength = 5.0f, float axisRadius = 0.02f, 
+			  float coneLength = 0.3, float coneRadius = 0.1f);
 
-	void Cube::draw() {
+void Cube::draw() {
 	
-		Vector3 offset = { 0.0f, 0.0f, 0.0f};
-		Vector3 factor = { 1.0f, 1.0f, 1.0f}; // scale factor
-		if (isPicking) {
-			if (picking.axis == Y_NEGATIVE) {
-				offset.y = picking.baseHeight * (1.0f - picking.scale) / 2.0f;
-				factor.y = picking.scale;
-			}
-			if (picking.axis == Y_POSITIVE) {
-				offset.y = picking.baseHeight * (picking.scale - 1.0f) / 2.0f;
-				factor.y = picking.scale;
-			}
-			if (picking.axis == Z_NEGATIVE) {
-				offset.z = picking.baseHeight * (1.0f - picking.scale) / 2.0f;
-				factor.z = picking.scale;
-			}
-			if (picking.axis == Z_POSITIVE) {
-				offset.z = picking.baseHeight * (picking.scale - 1.0f) / 2.0f;
-				factor.z = picking.scale;
-			}		
-			if (picking.axis == X_NEGATIVE) {
-				offset.x = picking.baseHeight * (1.0f - picking.scale) / 2.0f;
-				factor.x = picking.scale;
-			}
-			if (picking.axis == X_POSITIVE) {
-				offset.x = picking.baseHeight * (picking.scale - 1.0f) / 2.0f;
-				factor.x = picking.scale;
-			}		
-
-			DrawCubeWires({position.x, position.y + (picking.currentHeight - picking.baseHeight) / 2, position.z}, 
-						  2.0, picking.currentHeight, 2.0, PURPLE);
+	Vector3 offset = { 0.0f, 0.0f, 0.0f};
+	Vector3 factor = { 1.0f, 1.0f, 1.0f}; // scale factor
+	if (isPicking) {
+		if (picking.axis == Y_NEGATIVE) {
+			offset.y = picking.baseHeight * (1.0f - picking.scale) / 2.0f;
+			factor.y = picking.scale;
 		}
+		if (picking.axis == Y_POSITIVE) {
+			offset.y = picking.baseHeight * (picking.scale - 1.0f) / 2.0f;
+			factor.y = picking.scale;
+		}
+		if (picking.axis == Z_NEGATIVE) {
+			offset.z = picking.baseHeight * (1.0f - picking.scale) / 2.0f;
+			factor.z = picking.scale;
+		}
+		if (picking.axis == Z_POSITIVE) {
+			offset.z = picking.baseHeight * (picking.scale - 1.0f) / 2.0f;
+			factor.z = picking.scale;
+		}		
+		if (picking.axis == X_NEGATIVE) {
+			offset.x = picking.baseHeight * (1.0f - picking.scale) / 2.0f;
+			factor.x = picking.scale;
+		}
+		if (picking.axis == X_POSITIVE) {
+			offset.x = picking.baseHeight * (picking.scale - 1.0f) / 2.0f;
+			factor.x = picking.scale;
+		}		
 
-		Matrix scale = MatrixTranslate(offset.x, offset.y, offset.z);
-		scale = MatrixMultiply(MatrixScale(factor.x, factor.y, factor.z), scale);
-		model.transform = scale;
-
-		rlPushMatrix();
-		rlMultMatrixf(MatrixToFloat(transforms));
-		drawAxis(position, 1.5f, 0.02, 0.1, 0.05);
-		DrawModel(model, position, 1.0f, WHITE);
-		rlPopMatrix();
+		DrawCubeWires({position.x, position.y + (picking.currentHeight - picking.baseHeight) / 2, position.z}, 
+					  2.0, picking.currentHeight, 2.0, PURPLE);
 	}
+
+	Matrix scale = MatrixTranslate(offset.x, offset.y, offset.z);
+	scale = MatrixMultiply(MatrixScale(factor.x, factor.y, factor.z), scale);
+	model.transform = scale;
+
+	rlPushMatrix();
+	rlMultMatrixf(MatrixToFloat(transforms));
+	drawAxis(position, 1.5f, 0.02, 0.1, 0.05);
+	DrawModel(model, position, 1.0f, WHITE);
+	rlPopMatrix();
+}
 
 
 
 // ---------------------------------------------------------------------------------------
 // Handle input
 // ---------------------------------------------------------------------------------------
-	bool showFont = false;
-	bool showWordsTex = true;
-	bool cameraUpdateEnabled = false;
-	void handleUiKeys() {
-		if (IsKeyPressed(KEY_Q)) {
-			cameraUpdateEnabled = !cameraUpdateEnabled;
-			if (cameraUpdateEnabled) {
-				SetMousePosition(GetScreenWidth() /2, GetScreenHeight() /2);
-			}
-		}
-	
-		if (IsKeyPressed(KEY_E)) {
-			cube.swapTexture();
-		}
-
-		if (IsKeyPressed(KEY_T)) {
-			showWordsTex = !showWordsTex;
-		}
-	
-		if (IsKeyPressed(KEY_F)) {
-			showFont = !showFont;
+bool showFont = false;
+bool showWordsTex = true;
+bool cameraUpdateEnabled = false;
+void handleUiKeys() {
+	if (IsKeyPressed(KEY_Q)) {
+		cameraUpdateEnabled = !cameraUpdateEnabled;
+		if (cameraUpdateEnabled) {
+			SetMousePosition(GetScreenWidth() /2, GetScreenHeight() /2);
 		}
 	}
+	
+	if (IsKeyPressed(KEY_E)) {
+		cube.swapTexture();
+	}
+
+	if (IsKeyPressed(KEY_T)) {
+		showWordsTex = !showWordsTex;
+	}
+	
+	if (IsKeyPressed(KEY_F)) {
+		showFont = !showFont;
+	}
+}
 
 // ---------------------------------------------------------------------------------------
 // Draw Stuff
 // ---------------------------------------------------------------------------------------
-	Camera3D camera;
-	Camera3D poseCamera;
-	RenderTexture poseRenderTexture;
-	Rectangle poseRect = { 0.0f, 0.0f, 300, -168 };
+Camera3D camera;
+Camera3D poseCamera;
+RenderTexture poseRenderTexture;
+Rectangle poseRect = { 0.0f, 0.0f, 300, -168 };
 
 
-	void drawGrid(int slices, float spacing)
+void drawGrid(int slices, float spacing)
+{
+	int halfSlices = slices/2;
+
+	rlBegin(RL_LINES);
+	for (int i = -halfSlices; i <= halfSlices; i++)
 	{
-		int halfSlices = slices/2;
-
-		rlBegin(RL_LINES);
-		for (int i = -halfSlices; i <= halfSlices; i++)
+		if (i == 0)
 		{
-			if (i == 0)
-			{
-				rlColor3f(0.5f, 0.5f, 0.5f);
-			}
-			else
-			{
-				rlColor3f(0.75f, 0.75f, 0.75f);
-			}
-
-			rlVertex3f((float)i*spacing+1, 0.0f, (float)-halfSlices*spacing);
-			rlVertex3f((float)i*spacing+1, 0.0f, (float)halfSlices*spacing);
-
-			rlVertex3f((float)-halfSlices*spacing, 0.0f, (float)i*spacing+1);
-			rlVertex3f((float)halfSlices*spacing, 0.0f, (float)i*spacing+1);
+			rlColor3f(0.5f, 0.5f, 0.5f);
 		}
-rlEnd();
+		else
+		{
+			rlColor3f(0.75f, 0.75f, 0.75f);
+		}
+
+		rlVertex3f((float)i*spacing+1, 0.0f, (float)-halfSlices*spacing);
+		rlVertex3f((float)i*spacing+1, 0.0f, (float)halfSlices*spacing);
+
+		rlVertex3f((float)-halfSlices*spacing, 0.0f, (float)i*spacing+1);
+		rlVertex3f((float)halfSlices*spacing, 0.0f, (float)i*spacing+1);
+	}
+	rlEnd();
 }
 
 
@@ -919,7 +971,7 @@ void draw() {
 	} 
 
 	if (showWordsTex) {
-		cube.drawWordsTex();
+		cube.debugDrawWordsTex();
 		
 	}
 	
