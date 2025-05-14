@@ -132,9 +132,17 @@ int countWords(const char *text) {
 // ---------------------------------------------------------------------------------------
 #include <vector>
 
+
+struct WordData {
+	
+	std::vector<Vector2> offset;
+	std::vector<CellPos> cellPos;
+};
+
 struct QuoteData {
 	const char* quote;
 	int wordCount;
+	// WordData wordData;
 	std::vector<Vector2> offset;
 	std::vector<CellPos> cellPos;
 };
@@ -663,13 +671,13 @@ void Cube::updateRolling(float delta) {
 			strcpy(rotationInfo.TG_face, rotationInfo.entry.TG_face);
 
 			// set scale axis for swapping animation
-			const char *s = rotationInfo.LS_face;
-			if (s[0] == '6') picking.axis = Y_NEGATIVE;
-			if (s[0] == '1') picking.axis = Y_POSITIVE;
-			if (s[0] == '5') picking.axis = Z_POSITIVE;
-			if (s[0] == '3') picking.axis = Z_NEGATIVE;
-			if (s[0] == '2') picking.axis = X_POSITIVE;
-			if (s[0] == '4') picking.axis = X_NEGATIVE;	
+			const char *s = rotationInfo.TG_face;
+			if (s[0] == '1') picking.axis = Y_NEGATIVE;
+			if (s[0] == '6') picking.axis = Y_POSITIVE;
+			if (s[0] == '3') picking.axis = Z_POSITIVE;
+			if (s[0] == '5') picking.axis = Z_NEGATIVE;
+			if (s[0] == '4') picking.axis = X_POSITIVE;
+			if (s[0] == '2') picking.axis = X_NEGATIVE;	
 
 			
 			wordIndexOnGround = updateWordIndexOnGround();
@@ -940,10 +948,10 @@ void drawText() {
 	drawTextControls();
 	
 	if (!cameraUpdateEnabled) {
-		drawTextMovement();
-		drawTextAnimation();
-		drawTextPickup();
-		drawTextQuote();
+		// drawTextMovement();
+		// drawTextAnimation();
+		// drawTextPickup();
+		// drawTextQuote();
 	}
 }
 
